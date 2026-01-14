@@ -11,13 +11,19 @@ global positionCursor
 ; no argument; no return
 global clearScreen
 
+; rdi - prompt; rsi - pointer to memory; return: 1 success; 0 failure
+global promptUserNumberInput
+
 extern getchar
 extern printf
+extern scanf
 
 
 section .data
-  moveCursor db 0x1B, "[%d;%dH",0
+  moveCursor db 0x1B, "[%d;%dH", 0
   clearScreenANSI db 0x1B, "[2J", 0x1B, "[H", 0
+  numberInputFormat db "%u", 0
+  invalidInputWarn db "Invalid input, try again.", 0
 
 section .bss
   input resb 1
@@ -72,4 +78,65 @@ clearScreen:
   call printf
 
   pop rbp
+  ret
+
+; rdi - prompt; rsi - pointer to memory; return: 1 success; 0 failure
+promptUserNumberInput:
+  push rbp
+
+  ; set up local stack frame
+  mov rbp, rsp
+  sub rsp, 32
+
+  mov qword[rbp - 8], rdi
+  mov qword[rbp - 16], rsi
+  
+.loop:
+  mov rax, 0
+  mov rdi, qword[rbp - 8]
+  call printf
+
+  mov rax, 0
+  mov rdi, numberInputFormat
+  mov rsi, qword[rbp - 16]
+  call scanf
+
+  ; store return from scanf
+  mov qword[rbp - 24], rax
+
+  call flushBuffer
+  
+  ; check if return from scanf was a failure
+  cmp qword[rbp - 24], 0
+  ; if it failed, retry input
+  je .invalidInput
+  jmp .exitLoop
+
+
+.invalidInput:
+  mov rax, 0
+  mov rdi, invalidInputWarn
+  call printf
+  jmp .loop
+
+.exitLoop:
+  ; check if EOF
+  cmp qword[rbp - 24], -1
+  je .reachedEOF
+  jmp .success
+
+; set return values
+.reachedEOF:
+  mov rax, 0
+  jmp .end
+
+.success:
+  mov rax, 1
+  jmp .end
+
+  ; reset stack
+.end:
+  add rsp, 32
+  pop rbp
+
   ret
