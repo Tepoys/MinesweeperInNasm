@@ -1,0 +1,73 @@
+     1                                  ; Tepoys
+     2                                  ; Minesweepr in NASM
+     3                                  ; helper functions
+     4                                  
+     5                                  ; no argument, no return
+     6                                  global flushBuffer
+     7                                  
+     8                                  ; rdi - x position; rsi - y position; no return
+     9                                  global positionCursor
+    10                                  
+    11                                  ; no argument; no return
+    12                                  global clearScreen
+    13                                  
+    14                                  extern getchar
+    15                                  extern printf
+    16                                  
+    17                                  
+    18                                  section .data
+    19 00000000 1B5B25643B25644800        moveCursor db 0x1B, "[%d;%dH",0
+    20 00000009 1B5B324A1B5B4800          clearScreenANSI db 0x1B, "[2J", 0x1B, "[H", 0
+    21                                  
+    22                                  section .bss
+    23 00000000 ??                        input resb 1
+    24                                  
+    25                                  
+    26                                  section .text
+    27                                  
+    28                                  ; no argument, no return
+    29                                  flushBuffer:
+    30                                    ; maintain stack alignment
+    31 00000000 55                        push rbp
+    32                                  
+    33                                  .clearBuffer:
+    34                                  
+    35 00000001 E8(00000000)              call getchar
+    36                                  
+    37                                    ; check if returned char is end of file (al = lower 8 bit of rax)
+    38 00000006 3CFF                      cmp al, -1
+    39 00000008 7402                      je .EOF
+    40                                  
+    41 0000000A EBF5                      jmp .clearBuffer
+    42                                  
+    43                                  .EOF:
+    44 0000000C 5D                        pop rbp
+    45 0000000D C3                        ret
+    46                                  
+    47                                  ; rdi - x position; rsi - y position; no return
+    48                                  positionCursor:
+    49 0000000E 55                        push rbp
+    50                                    
+    51                                    ; setup printf call
+    52 0000000F 4889FA                    mov rdx, rdi
+    53 00000012 48BF-                     mov rdi, moveCursor
+    53 00000014 [0000000000000000] 
+    54                                    
+    55 0000001C B800000000                mov rax, 0
+    56 00000021 E8(00000000)              call printf
+    57                                    
+    58 00000026 5D                        pop rbp
+    59 00000027 C3                        ret
+    60                                    
+    61                                  ; no argument; no return
+    62                                  clearScreen:
+    63 00000028 55                        push rbp
+    64                                  
+    65                                    ; setup ANSI escape sequence with printf
+    66 00000029 4831C0                    xor rax, rax
+    67 0000002C 48BF-                     mov rdi, clearScreenANSI
+    67 0000002E [0900000000000000] 
+    68 00000036 E8(00000000)              call printf
+    69                                  
+    70 0000003B 5D                        pop rbp
+    71 0000003C C3                        ret

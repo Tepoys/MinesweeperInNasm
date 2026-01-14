@@ -1,0 +1,85 @@
+     1                                  ; Tepoys
+     2                                  ; Minesweeper in NASM
+     3                                  ; Menu for user input
+     4                                  DEFAULT ABS
+     5                                  
+     6                                  extern printf
+     7                                  extern scanf
+     8                                  extern flushBuffer
+     9                                  extern generateMines
+    10                                  extern positionCursor
+    11                                  extern clearScreen
+    12                                  
+    13                                  section .data
+    14 00000000 57656C636F6D652074-       welcome db "Welcome to minesweeper.", 10, "By Tepoys", 10, 0
+    14 00000009 6F206D696E65737765-
+    14 00000012 657065722E0A427920-
+    14 0000001B 5465706F79730A00   
+    15 00000023 456E74657220796F75-       menu db "Enter your choice:", 10, "1. Easy 9x9 (10 mines)", 10, "2. Intermediate 16x16 (40 mines)", 10, "3. Expert 30x16 (99 mines)", 10, "4. Quit", 0
+    15 0000002C 722063686F6963653A-
+    15 00000035 0A312E204561737920-
+    15 0000003E 39783920283130206D-
+    15 00000047 696E6573290A322E20-
+    15 00000050 496E7465726D656469-
+    15 00000059 617465203136783136-
+    15 00000062 20283430206D696E65-
+    15 0000006B 73290A332E20457870-
+    15 00000074 657274203330783136-
+    15 0000007D 20283939206D696E65-
+    15 00000086 73290A342E20517569-
+    15 0000008F 7400               
+    16                                    menuXOffset equ 19
+    17                                    menuYOffset equ 2
+    18                                    
+    19 00000091 257500                    inputFormat db "%u", 0
+    20                                    
+    21                                  
+    22                                  section .bss
+    23 00000000 ????????                  input resd 1
+    24                                  
+    25                                  section .text
+    26                                    global main
+    27                                  
+    28                                  main:
+    29                                    ; align stack frame (16 aligned)
+    30 00000000 55                        push rbp
+    31                                    
+    32 00000001 E8(00000000)              call clearScreen
+    33                                  
+    34 00000006 B800000000                mov rax, 0
+    35 0000000B 48BF-                     mov rdi, welcome
+    35 0000000D [0000000000000000] 
+    36 00000015 E8(00000000)              call printf
+    37                                  
+    38 0000001A B800000000                mov rax, 0
+    39 0000001F 48BF-                     mov rdi, menu
+    39 00000021 [2300000000000000] 
+    40 00000029 E8(00000000)              call printf
+    41                                  
+    42 0000002E BF13000000                mov rdi, menuXOffset
+    43 00000033 BE02000000                mov rsi, menuYOffset
+    44 00000038 E8(00000000)              call positionCursor
+    45                                  
+    46 0000003D B800000000                mov rax, 0
+    47 00000042 48BF-                     mov rdi, inputFormat
+    47 00000044 [9100000000000000] 
+    48 0000004C 48BE-                     mov rsi, input
+    48 0000004E [0000000000000000] 
+    49 00000056 E8(00000000)              call scanf
+    50                                  
+    51 0000005B E8(00000000)              call clearScreen
+    52                                  
+    53                                  printInput:
+    54 00000060 B800000000                mov rax, 0
+    55 00000065 48BF-                     mov rdi, inputFormat
+    55 00000067 [9100000000000000] 
+    56 0000006F 8B3425[00000000]          movzx rsi, dword[input]
+    57 00000076 E8(00000000)              call printf
+    58                                    
+    59 0000007B E8(00000000)              call clearScreen
+    60                                  
+    61 00000080 5D                        pop rbp
+    62                                  
+    63 00000081 B83C000000                mov rax, 60
+    64 00000086 BF00000000                mov rdi, 0
+    65 0000008B 0F05                      syscall
