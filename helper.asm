@@ -33,6 +33,10 @@ flushBuffer:
 .clearBuffer:
 
   call getchar
+  
+  ; check if return char is newline char
+  cmp al, 10
+  je .EOF
 
   ; check if returned char is end of file (al = lower 8 bit of rax)
   cmp al, -1

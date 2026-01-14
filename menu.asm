@@ -1,6 +1,6 @@
 ; Tepoys
 ; Minesweeper in NASM
-; Menu for user input
+; Menu for user input; the entry point.
 DEFAULT ABS
 
 extern printf
@@ -22,6 +22,7 @@ section .data
 
 section .bss
   input resd 1
+  firstDisplay resb 1
 
 section .text
   global main
@@ -29,35 +30,47 @@ section .text
 main:
   ; align stack frame (16 aligned)
   push rbp
-  
+
+  ; different cursor position on first menu
+  mov byte[firstDisplay], 1
+
   call clearScreen
 
   mov rax, 0
   mov rdi, welcome
   call printf
 
+.menuLoop:
   mov rax, 0
   mov rdi, menu
   call printf
 
+  ; compute Y offset using firstDisplay
+  mov rsi, menuYOffset
+
+  movzx rax, byte[firstDisplay]
+  test rax, rax
+  jz .notFirstTime
+  jmp .firstTime
+
+.firstTime:
+  add rsi, 2
+  mov byte[firstDisplay], 0
+  jmp main.notFirstTime
+
+.notFirstTime:
   mov rdi, menuXOffset
-  mov rsi, menuYOffset+2
   call positionCursor
 
   mov rax, 0
   mov rdi, inputFormat
   mov rsi, input
   call scanf
+  call flushBuffer
 
   call clearScreen
+  jmp .menuLoop
 
-printInput:
-  mov rax, 0
-  mov rdi, outputFormat
-  movzx rsi, dword[input]
-  call printf
-  
-;  call clearScreen
 
   pop rbp
 
