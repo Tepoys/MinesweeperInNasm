@@ -192,7 +192,6 @@ getRand:
   ; set up division to get rand within bounds
   mov ecx, dword[rbp-16]
   sub ecx, dword[rbp-8]
-  inc ecx
 
   xor edx, edx
   div ecx

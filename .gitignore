@@ -2,6 +2,8 @@
 MinesweeperInNasm
 MinesweeperInNasmDebug
 
+vgcore.*
+
 # Prerequisites
 *.d
 
