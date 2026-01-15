@@ -29,6 +29,8 @@ section .data
   customXPrompt db "Enter the X length:", 0
   customYPrompt db "Enter the Y length:", 0
   customMineCount db "Enter the number of mines:", 0
+
+  invalidInputWarn db "Input not recognized, please try again.", 10, 0
   
   inputFormat db "%u", 0
   outputFormat db "%u", 10, 0
@@ -126,6 +128,12 @@ parseInput:
   cmp rdi, 5
   je .quit
 
+  mov rax, 0
+  mov rdi, invalidInputWarn
+  call printf
+  jmp .return
+
+
 .easy:
   mov rdi, EASY_DIM
   mov rsi, EASY_DIM
@@ -167,6 +175,7 @@ parseInput:
   mov rsi, qword[rbp-24]
   mov rdx, qword[rbp-32]
   call minesweeper
+  jmp .return
 
 .quit:
   mov qword[rbp - 8], 1
