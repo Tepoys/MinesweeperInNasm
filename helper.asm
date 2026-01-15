@@ -18,12 +18,20 @@ global promptUserNumberInput
 ; no argument; no return
 global flushSTDOUT
 
+; no arguments; no return
+global seedRand
+
+; rdi - lower bound; rsi - upper bound; no return
+global getRand
+
 extern getchar
 extern printf
 extern scanf
 extern fflush
 extern stdout
-
+extern time
+extern srand
+extern rand
 
 section .data
   moveCursor db 0x1B, "[%d;%dH", 0
@@ -155,5 +163,43 @@ flushSTDOUT:
   mov rdi, [stdout]
   call fflush
 
+  pop rbp
+  ret
+
+seedRand:
+  push rbp
+
+  mov rdi, 0
+  call time
+
+  mov rdi, rax
+  call srand
+
+  pop rbp
+  ret
+
+; rdi - lower bound; rsi - upper bound; no return
+getRand:
+  push rbp
+  mov rbp, rsp
+  sub rsp,  16
+
+  mov qword[rbp-8], rdi
+  mov qword[rbp-16], rsi
+
+  call rand
+
+  ; set up division to get rand within bounds
+  mov ecx, dword[rbp-16]
+  sub ecx, dword[rbp-8]
+  inc ecx
+
+  xor edx, edx
+  div ecx
+
+  ; remainder in edx
+  mov eax, edx
+
+  add rsp, 16
   pop rbp
   ret
