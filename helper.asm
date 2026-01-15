@@ -2,6 +2,7 @@
 ; Minesweepr in NASM
 ; helper functions
 
+
 ; no argument, no return
 global flushBuffer
 
@@ -14,9 +15,14 @@ global clearScreen
 ; rdi - prompt; rsi - pointer to memory; return: 1 success; 0 failure
 global promptUserNumberInput
 
+; no argument; no return
+global flushSTDOUT
+
 extern getchar
 extern printf
 extern scanf
+extern fflush
+extern stdout
 
 
 section .data
@@ -76,6 +82,8 @@ clearScreen:
   xor rax, rax
   mov rdi, clearScreenANSI
   call printf
+
+  call flushSTDOUT
 
   pop rbp
   ret
@@ -139,4 +147,13 @@ promptUserNumberInput:
   add rsp, 32
   pop rbp
 
+  ret
+
+flushSTDOUT:
+  push rbp
+
+  mov rdi, [stdout]
+  call fflush
+
+  pop rbp
   ret

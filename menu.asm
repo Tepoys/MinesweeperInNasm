@@ -22,7 +22,7 @@ extern minesweeper
 
 section .data
   welcome db "Welcome to minesweeper.", 10, "By Tepoys", 10, 0
-  menu db "Enter your choice:", 10, "1. Easy 9x9 (10 mines)", 10, "2. Intermediate 16x16 (40 mines)", 10, "3. Expert 30x16 (99 mines)", 10, "4. Quit", 0
+  menu db "Enter your choice:", 10, "1. Easy 9x9 (10 mines)", 10, "2. Intermediate 16x16 (40 mines)", 10, "3. Expert 30x16 (99 mines)", 10, "4. Custom", 10, "5. Quit", 0
   menuXOffset equ 19
   menuYOffset equ 1
 
@@ -85,12 +85,15 @@ main:
   call flushBuffer
 
   call clearScreen
-
+  
+  movzx rdi, dword[input]
   call parseInput
 
-  jmp .menuLoop
+  jz .menuLoop
+  jmp exit
 
-
+exit:
+  call clearScreen
   pop rbp
 
   mov rax, 60
@@ -172,7 +175,7 @@ parseInput:
 .return:
   mov rax, qword[rbp - 8]
   
-  sub rsp, 32
+  add rsp, 32
   pop rbp
 
   ret
