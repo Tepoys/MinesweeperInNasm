@@ -29,7 +29,7 @@ section .data
   moveCursor db 0x1B, "[%d;%dH", 0
   clearScreenANSI db 0x1B, "[2J", 0x1B, "[H", 0
   numberInputFormat db "%u", 0
-  invalidInputWarn db "Invalid input, try again.", 0
+  invalidInputWarn db "Invalid input, try again.", 10, 0
 
 section .bss
   input resb 1
