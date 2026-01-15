@@ -1,7 +1,7 @@
 ; Tepoys
 ; Minesweepr in NASM
 ; helper functions
-
+DEFAULT ABS
 
 ; no argument, no return
 global flushBuffer
