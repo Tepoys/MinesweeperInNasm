@@ -95,7 +95,7 @@ main:
   jmp exit
 
 exit:
-  call clearScreen
+;  call clearScreen
   pop rbp
 
   mov rax, 60
