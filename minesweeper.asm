@@ -45,8 +45,8 @@ extern getRand
 
 section .data
   mallocFailedMsg db "Malloc returned null pointer (malloc failure).", 10, "Program exit", 10, 0
-  mine db "X", 0
-  noMine db "O", 0
+  mine db "X ", 0
+  noMine db "O ", 0
   newLine db 10, 0
   debugMinelayingAttempt db "Attempting to lay mine at (%u,%u)", 10, 0
 

@@ -38,6 +38,8 @@ section .data
   clearScreenANSI db 0x1B, "[2J", 0x1B, "[H", 0
   numberInputFormat db "%u", 0
   invalidInputWarn db "Invalid input, try again.", 10, 0
+  tooLowWarn db "Your input was too low (min: %d)", 10, 0
+  tooHighWarn db "Your input was too high (max: %d)", 10, 0
 
 section .bss
   input resb 1
@@ -96,16 +98,18 @@ clearScreen:
   pop rbp
   ret
 
-; rdi - prompt; rsi - pointer to memory; return: 1 success; 0 failure
+; rdi - prompt; rsi - pointer to memory; rdx - lower bounds; rcx - upper bounds; return: 1 success; 0 failure
 promptUserNumberInput:
   push rbp
 
   ; set up local stack frame
   mov rbp, rsp
-  sub rsp, 32
+  sub rsp, 48
 
   mov qword[rbp - 8], rdi
   mov qword[rbp - 16], rsi
+  mov qword[rbp - 40], rdx
+  mov qword[rbp - 48], rcx
   
 .loop:
   mov rax, 0
@@ -146,17 +150,49 @@ promptUserNumberInput:
   mov rax, 0
   jmp .end
 
+; succesfully gotten user number input
 .success:
+
+  ; check if number is within bounds
+  ; lower bound
+  mov rsi, qword[rbp - 16]
+  mov rsi, [rsi]
+  cmp rsi, qword[rbp - 40]
+  jl .tooLow
+  jmp .checkUpperBound
+
+.tooLow:
+  mov rdi, tooLowWarn
+  xor rax, rax
+  mov rsi, [rbp - 40]
+  call printf
+  jmp .loop
+
+.checkUpperBound:
+  cmp rsi, qword[rbp - 48]
+  jg .tooHigh
+  jmp .passBoundsCheck
+
+.tooHigh:
+  mov rdi, tooHighWarn
+  xor rax, rax
+  mov rsi, [rbp - 48]
+  call printf
+  jmp .loop
+
+.passBoundsCheck:
+
   mov rax, 1
   jmp .end
 
   ; reset stack
 .end:
-  add rsp, 32
+  add rsp, 48
   pop rbp
 
   ret
 
+; no arguments; no return
 flushSTDOUT:
   push rbp
 

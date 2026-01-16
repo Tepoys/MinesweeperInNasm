@@ -20,6 +20,15 @@ extern minesweeper
 %define EXPERT_YDIM 16
 %define EXPERT_MINE 99
 
+%define MIN_X 4
+%define MAX_X 100
+%define MIN_Y 4
+%define MAX_Y 70
+%define MIN_BOMB_COUNT 2
+; approx 30% max bombs
+%define MAX_BOMB_PERCENT_MULTIPLY 38
+%define MAX_BOMB_PERCENT_SHIFT_DIVIDE 7
+
 section .data
   welcome db "Welcome to minesweeper.", 10, "By Tepoys", 10, 0
   menu db "Enter your choice:", 10, "1. Easy 9x9 (10 mines)", 10, "2. Intermediate 16x16 (40 mines)", 10, "3. Expert 30x16 (99 mines)", 10, "4. Custom", 10, "5. Quit", 0
@@ -159,16 +168,36 @@ parseInput:
   mov rdi, customXPrompt
   mov qword[rbp - 16], 0
   lea rsi, [rbp-16]
+  mov rdx, MIN_X
+  mov rcx, MAX_X
   call promptUserNumberInput
 
   mov rdi, customYPrompt
   mov qword[rbp - 24], 0
   lea rsi, [rbp-24]
+  mov rdx, MIN_Y
+  mov rcx, MAX_Y
   call promptUserNumberInput
+
+  ; calculate max mine count using dimensions of minefield
+  ; assuming (x*y)/32 is within the bounds of 32 bit max unsigned
+  mov rax, qword[rbp - 16] ; assuming upper 32 bit of rax is all 0
+  mov rcx, qword[rbp - 24] ; assuming upper 32 bit of rcx is all 0
+  mul ecx
+
+  ; result in eax
+  mov ecx, MAX_BOMB_PERCENT_MULTIPLY
+  mul ecx
+
+  ; result in eax again
+  shr eax, MAX_BOMB_PERCENT_SHIFT_DIVIDE
+  ; devide by (originally shift is 7) 128
 
   mov rdi, customMineCount
   mov qword[rbp - 32], 0
   lea rsi, [rbp-32]
+  mov rdx, MIN_BOMB_COUNT
+  mov rcx, rax
   call promptUserNumberInput
 
   mov rdi, qword[rbp-16]
