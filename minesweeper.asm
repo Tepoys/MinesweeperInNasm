@@ -90,7 +90,7 @@ generateMines:
   mov rbp, rsp
   sub rsp, 32
   
-  mov qword[allocState], -1
+  mov qword[allocState], MINE
   
   ; save registers (caller saved)
   mov [rbp - 8], rdx ; # mines
@@ -161,16 +161,16 @@ generateMines:
   mov rsi, qword[rbp-24]
   call getRand
   
-.debugPrint:
-  ; debug
-  push rax
-  push rdi
-  mov rdi, debugMinelayingAttempt
-  mov rsi, r14
-  mov rdx, rax
-  call printf
-  pop rdi
-  pop rax
+; .debugPrint:
+;   ; debug
+;   push rax
+;   push rdi
+;   mov rdi, debugMinelayingAttempt
+;   mov rsi, r14
+;   mov rdx, rax
+;   call printf
+;   pop rdi
+;   pop rax
 
 
   ; get the y offset
@@ -192,7 +192,7 @@ generateMines:
   ; data is now inside of al
 
   ; check if there is a mine there
-  cmp al, -1
+  cmp al, MINE
   je .overlapMine
   jmp .noMine
 
@@ -202,7 +202,7 @@ generateMines:
 
   ; set square a mine and decrement mine counter
 .noMine:
-  mov byte[rdi], -1
+  mov byte[rdi], MINE
 
   dec r15
   jnz .minelayingLoop
@@ -295,4 +295,190 @@ printMinefield:
   pop r14
   pop r15
   pop rbp
+  ret
+
+  ; rdi - minefield; rsi - x length; rdx - y length; no return
+  ; counts the mines surounding each square and sets the mine count accordingly
+countMines:
+  
+  push rbp
+  push r15
+  push r14
+  push r13
+  push r12
+  push rbx
+
+  mov rbp, rsp
+  sub rsp, 40
+  
+  ; r15 - y pointer; r14 - y index
+  ; r13 - x pointer; r12 - x index
+  mov r15, rdi
+  mov r14, 0
+.mainYLoop:
+  mov r13, [r15]
+  mov r12, 0
+
+.mainXLoop:
+
+; if current square is mine, skip
+cmp [r13], MINE
+je .skipCountCurrentSquare
+
+; bounds checking to make sure we dont try to look outside of the minefield
+.calculateBounds:
+  ; r8 - y lowerbound; r9 - y upper bound
+  mov r8, r14
+  mov r9, r8
+  dec r8
+  inc r9
+
+  ; rbx - x lower bound; rcx - x upper bound
+  mov rbx, r12
+  mov rcx, rbx
+  dec rbx
+  inc rcx
+
+.yLowerBoundCheck:
+  cmp r8, 0
+  jl .yBoundTooLow
+  jmp .yUpperBoundCheck
+
+.yBoundTooLow:
+  inc r8
+  jmp .xLowerBoundCheck
+  
+.yUpperBoundCheck:
+  cmp r9, rdx
+  jge .yBoundTooHigh
+  jmp .xLowerBoundCheck
+
+.yBoundTooHigh:
+  dec r9
+  jmp .xLowerBoundCheck
+
+.xLowerBoundCheck:
+  cmp rbx, 0
+  jl .xBoundTooLow
+  jmp .xUpperBoundCheck
+
+.xBoundTooLow:
+  inc rbx
+  jmp .endBoundsCheck
+
+.xUpperBoundCheck:
+  cmp rcx, rsi
+  jge .xBoundTooHigh
+  jmp .endBoundsCheck
+
+.xBoundTooHigh:
+  dec rcx
+  jmp .endBoundsCheck
+
+.endBoundsCheck:
+  ; store r15 (originally y pointer), use now as y pointer for inner loop
+  mov qword[rbp - 8], r15
+  cmp r8, 0
+  je .noDecrement
+  jmp .decrement
+
+.noDecrement:
+  jmp .endSetupBoundPointer
+
+.decrement:
+  ; move r15 back by a qword (to the previous pointer)
+  sub r15, 8
+  jmp .endSetupBoundPointer
+
+; use min bounds for x and y as index (loop until those reach max bounds)
+.endSetupBoundPointer:
+  ; ; find range of Y
+  ; mov r13, r9
+  ; sub r13, r8
+  ; mov qword[rbp-24], r8
+  ;
+  ; ; start iterator of x
+  ; mov qword[rbp - 16], rbx
+
+  ; create mine counter
+  mov qword[rbp - 32], 0
+  
+.mineCountingLoopY:
+  ; set up x iterator for x loop
+  mov rax, [r15]
+  ; increment inner x array to starting x index
+  add rax, rbp
+
+.mineCountingLoopX:
+  cmp [rax], MINE
+  je .hasMine
+  jmp .itterateX
+
+.hasMine:
+  ; this is not needed on second thought
+  ; ; check if we are considering the current square
+  ; cmp rbx, rsi
+  ; jne .incrementMineCounter
+  ; cmp r8, rdx
+  ; je .itterateX
+  ; jmp .incrementMineCounter
+
+; .incrementMineCounter:
+  inc qword[rbp - 32]
+  jmp .itterateX
+
+.itterateX:
+  ; increment pointer
+  inc rax
+  ; increment index
+  inc rbx
+  ; compare current index (rbx) with max index (rcx)
+  cmp rbx, rcx
+  jle .mineCountingLoopX
+
+.itterateY:
+  ; move to the next x row
+  add r15, 8
+  ; increment index
+  inc r8
+
+  ; compare current index with max index
+  cmp r8, r9
+  jle .mineCountingLoopY
+
+.countResult:
+  ; reset r15
+  mov r15, qword[rbp - 8]
+  ;result is inside of [rbp-32]
+  ; r15 - y pointer; r14 - y index
+  ; r13 - x pointer; r12 - x index
+
+  ; move count into square
+  mov rax, qword[rbp-32]
+  mov byte[r13], al
+
+.skipCountCurrentSquare:
+.itterateMainX:
+  inc r12
+  inc r13
+
+  cmp r12, rsi
+  jl .mainXLoop
+
+.itterateMainY:
+  add r15, 8
+  inc r14
+
+  cmp r14, rdx
+  jl .mainYLoop
+
+.finishedCountingAllSquares:
+  add rsp, 40
+  pop rbx
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  pop rbp
+
   ret

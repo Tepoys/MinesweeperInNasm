@@ -23,7 +23,7 @@ extern minesweeper
 %define MIN_X 4
 %define MAX_X 100
 %define MIN_Y 4
-%define MAX_Y 70
+%define MAX_Y 60
 %define MIN_BOMB_COUNT 2
 ; approx 30% max bombs
 %define MAX_BOMB_PERCENT_MULTIPLY 38
