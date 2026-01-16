@@ -69,8 +69,22 @@ minesweeper:
   mov qword[y], rsi
 
   call generateMines
-  mov [map], rax
+  mov qword[map], rax
 
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefield
+
+  mov rdi, newLine
+  xor rax, rax
+  call printf
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call countMines
+  
   mov rdi, qword[map]
   mov rsi, qword[x]
   mov rdx, qword[y]
@@ -93,9 +107,9 @@ generateMines:
   mov qword[allocState], MINE
   
   ; save registers (caller saved)
-  mov [rbp - 8], rdx ; # mines
-  mov [rbp - 16], rdi ; x
-  mov [rbp - 24], rsi ; y
+  mov qword[rbp - 8], rdx ; # mines
+  mov qword[rbp - 16], rdi ; x
+  mov qword[rbp - 24], rsi ; y
 
   ; calculate y length (8 byte per memory adress)
   mov rax, 8
@@ -207,7 +221,7 @@ generateMines:
   dec r15
   jnz .minelayingLoop
 
-  mov rax, [rbp-32]
+  mov rax, qword[rbp-32]
 
   add rsp, 32
   pop r15
@@ -316,13 +330,13 @@ countMines:
   mov r15, rdi
   mov r14, 0
 .mainYLoop:
-  mov r13, [r15]
+  mov r13, qword[r15]
   mov r12, 0
 
 .mainXLoop:
 
 ; if current square is mine, skip
-cmp [r13], MINE
+cmp byte[r13], MINE
 je .skipCountCurrentSquare
 
 ; bounds checking to make sure we dont try to look outside of the minefield
@@ -402,15 +416,17 @@ je .skipCountCurrentSquare
 
   ; create mine counter
   mov qword[rbp - 32], 0
+  mov qword[rbp - 40], rbx
   
 .mineCountingLoopY:
+  mov rbx, qword[rbp - 40]
   ; set up x iterator for x loop
-  mov rax, [r15]
+  mov rax, qword[r15]
   ; increment inner x array to starting x index
-  add rax, rbp
+  add rax, rbx
 
 .mineCountingLoopX:
-  cmp [rax], MINE
+  cmp byte[rax], MINE
   je .hasMine
   jmp .itterateX
 
