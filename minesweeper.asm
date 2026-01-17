@@ -849,12 +849,148 @@ printMinefieldWithColor:
   ret
 
 ; rdi - current map; rsi - current X; rdx - current Y; calls revealSquare on all adjacent squares
+; returns 0 on success; 1 on user lost
 revealSuround:
 ret
 
 ; rdi - current map; rsi - current X; rdx - current Y; return surounding flag count
 countSuroundingFlags:
-ret
+push rbp
+push r15
+push r14
+push r13
+push r12
+push rbx
+mov rbp, rsp
+sub rsp, 24
+
+  ; setup for loop
+  mov r15, rdi
+
+; bounds checking to make sure we dont try to look outside of the minefield
+.calculateBounds:
+  ; r8 - y lowerbound; r9 - y upper bound
+  mov r8, rdx
+  mov r9, r8
+  dec r8
+  inc r9
+
+  ; rbx - x lower bound; rcx - x upper bound
+  mov rbx, rsi
+  mov rcx, rbx
+  dec rbx
+  inc rcx
+
+.yLowerBoundCheck:
+  cmp r8, 0
+  jl .yBoundTooLow
+  jmp .yUpperBoundCheck
+
+.yBoundTooLow:
+  inc r8
+  jmp .xLowerBoundCheck
+  
+.yUpperBoundCheck:
+  cmp r9, rdx
+  jge .yBoundTooHigh
+  jmp .xLowerBoundCheck
+
+.yBoundTooHigh:
+  dec r9
+  jmp .xLowerBoundCheck
+
+.xLowerBoundCheck:
+  cmp rbx, 0
+  jl .xBoundTooLow
+  jmp .xUpperBoundCheck
+
+.xBoundTooLow:
+  inc rbx
+  jmp .endBoundsCheck
+
+.xUpperBoundCheck:
+  cmp rcx, rsi
+  jge .xBoundTooHigh
+  jmp .endBoundsCheck
+
+.xBoundTooHigh:
+  dec rcx
+  jmp .endBoundsCheck
+
+.endBoundsCheck:
+  ; move r15 based off of y offset
+  push rcx
+  mov eax, 8
+  mov rcx, r8
+  mul ecx
+  pop rcx
+
+  add r15, rax
+
+  ; r15 is now min y bounds
+
+  ; use min bounds for x and y as index (loop until those reach max bounds)
+.endSetupBoundPointer:
+  ; create flag counter
+  mov qword[rbp - 16], 0
+  mov qword[rbp - 24], rbx
+
+.flagCountingLoopY:
+  mov rbx, qword[rbp - 24]
+  ; set up x iterator for x loop
+  mov rax, qword[r15]
+  ; increment inner x array to starting x index
+  add rax, rbx
+
+.flagCountingLoopX:
+  cmp byte[rax], ZERO_FLAGGED
+  jnge .itterateX
+  cmp byte[rax], EIGHT_FLAGGED
+  jle .hasFlag
+  cmp byte[rax], REAL_BOMB_FLAG
+  je .hasFlag
+  jmp .itterateX
+
+.hasFlag:
+  ; .incrementMineCounter:
+  inc qword[rbp - 16]
+  jmp .itterateX
+
+.itterateX:
+  ; increment pointer
+  inc rax
+  ; increment index
+  inc rbx
+  ; compare current index (rbx) with max index (rcx)
+  cmp rbx, rcx
+  jle .flagCountingLoopX
+
+.itterateY:
+  ; move to the next x row
+  add r15, 8
+  ; increment index
+  inc r8
+
+  ; compare current index with max index
+  cmp r8, r9
+  jle .flagCountingLoopY
+
+.countResult:
+  ; result is inside of [rbp-16]
+  ; r15 - y pointer; r14 - y index
+  ; r13 - x pointer; r12 - x index
+
+  ; move count into square
+  mov rax, qword[rbp-16]
+
+  add rsp, 24
+  pop rbx
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  pop rbp
+  ret
 
 ; no arguments (all arguments assumed to be in reserved storage); 
 ; 0: valid reveal; 1: user loset; 2: invalid reveal, square is a flag; 3: invalid unknown; 4: tried to reveal 0 already revealed; 5 invalidFlagCount
