@@ -851,18 +851,165 @@ printMinefieldWithColor:
 ; rdi - current map; rsi - current X; rdx - current Y; calls revealSquare on all adjacent squares
 ; returns 0 on success; 1 on user lost
 revealSuround:
-ret
+  push rbp
+  push r15
+  push r14
+  push r13
+  push r12
+  push rbx
+  mov rbp, rsp
+  sub rsp, 24
+
+  ; setup for loop
+  mov r15, rdi
+
+; bounds checking to make sure we dont try to look outside of the minefield
+.calculateBounds:
+  ; r8 - y lowerbound; r9 - y upper bound
+  mov r8, rdx
+  mov r9, r8
+  dec r8
+  inc r9
+
+  ; rbx - x lower bound; rcx - x upper bound
+  mov rbx, rsi
+  mov rcx, rbx
+  dec rbx
+  inc rcx
+
+.yLowerBoundCheck:
+  cmp r8, 0
+  jl .yBoundTooLow
+  jmp .yUpperBoundCheck
+
+.yBoundTooLow:
+  inc r8
+  jmp .xLowerBoundCheck
+  
+.yUpperBoundCheck:
+  cmp r9, rdx
+  jge .yBoundTooHigh
+  jmp .xLowerBoundCheck
+
+.yBoundTooHigh:
+  dec r9
+  jmp .xLowerBoundCheck
+
+.xLowerBoundCheck:
+  cmp rbx, 0
+  jl .xBoundTooLow
+  jmp .xUpperBoundCheck
+
+.xBoundTooLow:
+  inc rbx
+  jmp .endBoundsCheck
+
+.xUpperBoundCheck:
+  cmp rcx, rsi
+  jge .xBoundTooHigh
+  jmp .endBoundsCheck
+
+.xBoundTooHigh:
+  dec rcx
+  jmp .endBoundsCheck
+
+.endBoundsCheck:
+  ; move r15 based off of y offset
+  push rcx
+  mov eax, 8
+  mov rcx, r8
+  mul ecx
+  pop rcx
+
+  add r15, rax
+
+  ; r15 is now min y bounds
+
+  ; use min bounds for x and y as index (loop until those reach max bounds)
+.endSetupBoundPointer:
+  mov qword[rbp - 24], rbx
+
+.flagCountingLoopY:
+  mov rbx, qword[rbp - 24]
+  ; set up x iterator for x loop
+  mov rax, qword[r15]
+  ; increment inner x array to starting x index
+  add rax, rbx
+
+.flagCountingLoopX:
+  push rdi
+  push rsi
+  push rax
+  push rdx
+  push rcx
+  push rcx
+
+  mov rdi, rbx
+  mov rsi, r8
+  call revealSquare
+
+  mov qword[rbp-8], rax
+
+  pop rcx
+  pop rcx
+  pop rdx
+  pop rax
+  pop rsi
+  pop rdi
+
+  cmp qword[rbp-8], 1
+  je .result
+
+  mov qword[rbp-8], 0
+  jmp .itterateX
+
+
+.itterateX:
+  ; increment pointer
+  inc rax
+  ; increment index
+  inc rbx
+  ; compare current index (rbx) with max index (rcx)
+  cmp rbx, rcx
+  jle .flagCountingLoopX
+
+.itterateY:
+  ; move to the next x row
+  add r15, 8
+  ; increment index
+  inc r8
+
+  ; compare current index with max index
+  cmp r8, r9
+  jle .flagCountingLoopY
+
+.result:
+  ; result is inside of [rbp-16]
+  ; r15 - y pointer; r14 - y index
+  ; r13 - x pointer; r12 - x index
+
+  ; move count into square
+  mov rax, qword[rbp-16]
+
+  add rsp, 24
+  pop rbx
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  pop rbp
+  ret
 
 ; rdi - current map; rsi - current X; rdx - current Y; return surounding flag count
 countSuroundingFlags:
-push rbp
-push r15
-push r14
-push r13
-push r12
-push rbx
-mov rbp, rsp
-sub rsp, 24
+  push rbp
+  push r15
+  push r14
+  push r13
+  push r12
+  push rbx
+  mov rbp, rsp
+  sub rsp, 24
 
   ; setup for loop
   mov r15, rdi
@@ -992,7 +1139,7 @@ sub rsp, 24
   pop rbp
   ret
 
-; no arguments (all arguments assumed to be in reserved storage); 
+; rdi - x cordinate, rsi - y cordinate; map and max width assumed to be in reserved data
 ; 0: valid reveal; 1: user loset; 2: invalid reveal, square is a flag; 3: invalid unknown; 4: tried to reveal 0 already revealed; 5 invalidFlagCount
 ; attempts to reveal the square the player is currently hovering
 revealSquare:
@@ -1002,20 +1149,23 @@ revealSquare:
   mov rbp, rsp
   sub rsp, 32
 
+  mov qword[rbp-24], rdi
+  mov qword[rbp-32], rsi
+
   ; exit code
   mov qword[rbp - 8], 0
 
   mov rdi, qword[map]
   ; find offset
   mov eax, 8
-  mov rcx, qword[currentY]
+  mov rcx, qword[rbp-32]
   mul ecx
   ; apply offset
   add rdi, rax
 
   ; apply x offset
   mov rsi, qword[rdi]
-  add rsi, qword[currentX]
+  add rsi, qword[rbp-24]
   mov qword[rbp-16], rsi
   mov sil, byte[rsi]
   
@@ -1083,8 +1233,8 @@ revealSquare:
   push rdi
 
   mov rdi, qword[map]
-  mov rsi, qword[currentX]
-  mov rdx, qword[currentY]
+  mov rsi, qword[rbp-24]
+  mov rdx, qword[rbp-32]
   call countSuroundingFlags
 
   pop rsi
