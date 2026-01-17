@@ -668,26 +668,6 @@ printMinefieldWithColor:
   mov qword[rbp - 16], 0
 
 .printLoopX:
-  ; check cursor position
-  mov rax, qword[currentX]
-  cmp rax, qword[rbp-16]
-  jne .inconsistentXPosition
-
-  mov rax, qword[currentY]
-  cmp rax, qword[rbp-24]
-  jne .inconsistentYPosition
-  jmp .overrideBackground
-.overrideBackground:
-  mov rax, 0
-  mov rdi, reset
-  call printf
-  mov rax, 0
-  mov rdi, cursorHighlight
-  call printf
-  ; TODO move to bellow
-  
-.inconsistentYPosition:
-.inconsistentXPosition:
   cmp byte[r13], 10
   jl .unrevealed
   jmp .revealed
@@ -811,16 +791,33 @@ printMinefieldWithColor:
 
   ; print the current square
 .printSquare:
-  xor rax, rax
+   ; check cursor position
+  mov rax, qword[currentX]
+  cmp rax, qword[rbp-16]
+  jne .inconsistentXPosition
+
+  mov rax, qword[currentY]
+  cmp rax, qword[rbp-24]
+  jne .inconsistentYPosition
+  jmp .overrideBackground
+.overrideBackground:
+  ; save previous rdi (and align 16byte stack alignment)
+  push rdi
+  push rdi
+
+  mov rax, 0
+  mov rdi, reset
+  ; call printf
+  mov rax, 0
+  mov rdi, cursorHighlight
   call printf
 
+  pop rdi
+  pop rdi
+.inconsistentYPosition:
+.inconsistentXPosition:
   xor rax, rax
-  mov rdi, background
-  ;call printf
-
-  xor rax, rax
-  mov rdi, space
-  ;call printf
+  call printf
 
   xor rax, rax
   mov rdi, reset
@@ -850,3 +847,6 @@ printMinefieldWithColor:
   pop r15
   pop rbp
   ret
+
+
+
