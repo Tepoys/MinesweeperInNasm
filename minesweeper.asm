@@ -17,7 +17,7 @@ DEFAULT ABS
 %define EIGHT_UNREVEALED 8
 ; %define ZERO_REVEALED 10
 ; for itterating over 0 chunks to auto display numbers
-%define ZERO_REVEALED_ITTERATED 32
+%define ZERO_REVEALED_ITTERATED 10
 %define ONE_REVEALED 11
 %define TWO_REVEALED 12
 %define THREE_REVEALED 13
@@ -91,6 +91,8 @@ section .data
   eightText db "[8]", 0
   reset db 0x1B, "[0m", 0
   space db "[ ]", 0
+  returnValue db "Return value of: %u", 10, 0
+  error db "This was not supposed to happen, for debug purposes only.", 0
 
 
 section .bss
@@ -155,9 +157,52 @@ minesweeper:
   mov qword[currentY], 5
   call printMinefieldWithColor
 
+debug1:
+  mov rdi, 5
+  mov rsi, 5
+  call testRevealDebug
+
+  mov rdi, 0
+  mov rsi, 0
+  call  testRevealDebug
+
   add rsp, 32
   pop rbp
   ret
+
+; rdi - x; rsi - y
+testRevealDebug:
+  push rbp
+  call revealSquare
+
+  mov rsi, rax
+  mov rdi, returnValue
+  xor rax, rax
+  call printf
+
+  mov rdi, newLine
+  xor rax, rax
+  call printf
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  mov qword[currentX], 5
+  mov qword[currentY], 5
+  call printMinefieldWithColor
+
+  mov rdi, newLine
+  xor rax, rax
+  call printf
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldSmart
+
+  pop rbp
+  ret
+
 
 ; mines represented in the array by -1
 ; rdi - minesweeper x length; rsi - minesweeper y length; rdx - minesweeper mine count; return: memory pointer to the 2d array of size x by y
@@ -687,6 +732,10 @@ printMinefieldWithColor:
   jnge .notFlagged
   cmp byte[r13], REAL_BOMB_FLAG
   jle .hasFlag
+
+  cmp byte[r13], BOMB_REVEALED
+  je .hasBomb
+
   jmp .notFlagged
 
 .notFlagged:
@@ -708,6 +757,19 @@ printMinefieldWithColor:
   je .hasSeven
   cmp byte[r13], EIGHT_REVEALED
   je .hasEight
+
+.errorUnknown:
+  mov rax, 0
+  mov rdi, error
+  jmp .printSquare
+
+.hasBomb:
+  mov rax, 0
+  mov rdi, bomb
+  call printf
+
+  mov rdi, bombText
+  jmp .printSquare
 
 .hasFlag:
   mov rax, 0
@@ -860,6 +922,9 @@ revealSuround:
   mov rbp, rsp
   sub rsp, 24
 
+  ; rsp-8 is return value
+  mov qword[rsp-8], 0
+
   ; setup for loop
   mov r15, rdi
 
@@ -887,7 +952,7 @@ revealSuround:
   jmp .xLowerBoundCheck
   
 .yUpperBoundCheck:
-  cmp r9, rdx
+  cmp r9, qword[y]
   jge .yBoundTooHigh
   jmp .xLowerBoundCheck
 
@@ -905,7 +970,7 @@ revealSuround:
   jmp .endBoundsCheck
 
 .xUpperBoundCheck:
-  cmp rcx, rsi
+  cmp rcx, qword[x]
   jge .xBoundTooHigh
   jmp .endBoundsCheck
 
@@ -937,12 +1002,28 @@ revealSuround:
   add rax, rbx
 
 .flagCountingLoopX:
+  cmp rbx, rsi
+  jne .differentXCord
+  cmp r8, rdx
+  jne .differentYCord
+  je .itterateX
+
+
+.differentYCord:
+.differentXCord:
+  cmp byte[rax], ZERO_REVEALED_ITTERATED
+  jge .itterateX
+  ; cmp byte[rax], ONE_REVEALED
+  ; jge .itterateX
+
   push rdi
   push rsi
   push rax
   push rdx
   push rcx
   push rcx
+  push r8
+  push r9
 
   mov rdi, rbx
   mov rsi, r8
@@ -950,6 +1031,8 @@ revealSuround:
 
   mov qword[rbp-8], rax
 
+  pop r9
+  pop r8
   pop rcx
   pop rcx
   pop rdx
@@ -989,7 +1072,7 @@ revealSuround:
   ; r13 - x pointer; r12 - x index
 
   ; move count into square
-  mov rax, qword[rbp-16]
+  mov rax, qword[rbp-8]
 
   add rsp, 24
   pop rbx
@@ -1038,7 +1121,7 @@ countSuroundingFlags:
   jmp .xLowerBoundCheck
   
 .yUpperBoundCheck:
-  cmp r9, rdx
+  cmp r9, qword[y]
   jge .yBoundTooHigh
   jmp .xLowerBoundCheck
 
@@ -1056,7 +1139,7 @@ countSuroundingFlags:
   jmp .endBoundsCheck
 
 .xUpperBoundCheck:
-  cmp rcx, rsi
+  cmp rcx, qword[x]
   jge .xBoundTooHigh
   jmp .endBoundsCheck
 
@@ -1149,6 +1232,22 @@ revealSquare:
   mov rbp, rsp
   sub rsp, 32
 
+  ; ; print reveal debug
+  ; push rdi
+  ; push rsi
+  ; mov rdi, newLine
+  ; xor rax, rax
+  ; call printf
+  ;
+  ; mov rdi, qword[map]
+  ; mov rsi, qword[x]
+  ; mov rdx, qword[y]
+  ; mov qword[currentX], 5
+  ; mov qword[currentY], 5
+  ; call printMinefieldWithColor
+  ; pop rsi
+  ; pop rdi
+
   mov qword[rbp-24], rdi
   mov qword[rbp-32], rsi
 
@@ -1166,22 +1265,23 @@ revealSquare:
   ; apply x offset
   mov rsi, qword[rdi]
   add rsi, qword[rbp-24]
+  ; store pointer to original value in rbp-16
   mov qword[rbp-16], rsi
-  mov sil, byte[rsi]
+  movzx rsi, byte[rsi]
   
-  cmp rsi, EIGHT_UNREVEALED
+  cmp sil, EIGHT_UNREVEALED
   jl .valid
   jmp .invalid
 
 .invalid:
-  cmp rsi, ONE_REVEALED
-  jnge .nextInvalidCheck1
-  cmp rsi, EIGHT_REVEALED
-  jnle .nextInvalidCheck1
+  cmp sil, ONE_REVEALED
+  jl .nextInvalidCheck1
+  cmp sil, EIGHT_REVEALED
+  jg .nextInvalidCheck1
   jmp .validRevealed
 
 .nextInvalidCheck1:
-  cmp rsi, ZERO_REVEALED_ITTERATED
+  cmp sil, ZERO_REVEALED_ITTERATED
   je .invalidAlreadyRevealed
   jmp .nextInvalidCheck2
 
@@ -1190,10 +1290,10 @@ revealSquare:
   jmp .outputDetermined
 
 .nextInvalidCheck2:
-  cmp rsi, ZERO_FLAGGED
-  jnge .nextInvalidCheck3
-  cmp rsi, REAL_BOMB_FLAG
-  jnle .nextInvalidCheck3
+  cmp sil, ZERO_FLAGGED
+  jl .nextInvalidCheck3
+  cmp sil, REAL_BOMB_FLAG
+  jg .nextInvalidCheck3
   jmp .invalidSquareIsFlag
 
 .invalidSquareIsFlag:
@@ -1205,25 +1305,29 @@ revealSquare:
   jmp .outputDetermined
 
 .valid:
-  cmp rsi, MINE
+  cmp sil, MINE
   je .setLost
   jmp .numberUnrevealed
 
 .setLost:
-  mov qword[rbp-8], 2
+  mov rsi, qword[rbp-16]
+  mov byte[rsi], BOMB_REVEALED
+  mov qword[rbp-8], 1
   jmp .outputDetermined
 
 .numberUnrevealed:
-  cmp rsi, ZERO_UNREVEALED
+  cmp sil, ZERO_UNREVEALED
   je .revealZero
 
   ; valid reveal of unrevealed
-  add qword[rbp-16], 10
+  mov rsi, qword[rbp-16]
+  add byte[rsi], 10
+  mov qword[rbp-8], 0
   jmp .outputDetermined
 
 .revealZero:
   mov rsi, qword[rbp-16]
-  mov qword[rsi], ZERO_REVEALED_ITTERATED
+  mov byte[rsi], ZERO_REVEALED_ITTERATED
   jmp .revealSurounding
 
 
@@ -1241,22 +1345,26 @@ revealSquare:
   pop rdi
 
   mov rsi, qword[rbp-16]
+  movzx rsi, byte[rsi]
   sub rsi, 10
   cmp rax, rsi
   jne .invalidFlagCount
   jmp .revealSurounding
 
 .invalidFlagCount:
-  mov qword[rsp-8], 5
+  mov qword[rbp-8], 5
   jmp .outputDetermined
 
 .revealSurounding:
+  mov rdi, qword[map]
+  mov rsi, qword[rbp-24]
+  mov rdx, qword[rbp-32]
   call revealSuround
-  mov qword[rsp-8], rax
+  mov qword[rbp-8], rax
   jmp .outputDetermined
 
 .outputDetermined:
-  mov rax, qword[rsp-8]
+  mov rax, qword[rbp-8]
   add rsp, 32
   pop r14
   pop r15
