@@ -848,5 +848,131 @@ printMinefieldWithColor:
   pop rbp
   ret
 
+; rdi - current map; rsi - current X; rdx - current Y; calls revealSquare on all adjacent squares
+revealSuround:
+ret
+
+; rdi - current map; rsi - current X; rdx - current Y; return surounding flag count
+countSuroundingFlags:
+ret
+
+; no arguments (all arguments assumed to be in reserved storage); 
+; 0: valid reveal; 1: user loset; 2: invalid reveal, square is a flag; 3: invalid unknown; 4: tried to reveal 0 already revealed; 5 invalidFlagCount
+; attempts to reveal the square the player is currently hovering
+revealSquare:
+  push rbp
+  push r15
+  push r14
+  mov rbp, rsp
+  sub rsp, 32
+
+  ; exit code
+  mov qword[rbp - 8], 0
+
+  mov rdi, qword[map]
+  ; find offset
+  mov eax, 8
+  mov rcx, qword[currentY]
+  mul ecx
+  ; apply offset
+  add rdi, rax
+
+  ; apply x offset
+  mov rsi, qword[rdi]
+  add rsi, qword[currentX]
+  mov qword[rbp-16], rsi
+  mov sil, byte[rsi]
+  
+  cmp rsi, EIGHT_UNREVEALED
+  jl .valid
+  jmp .invalid
+
+.invalid:
+  cmp rsi, ONE_REVEALED
+  jnge .nextInvalidCheck1
+  cmp rsi, EIGHT_REVEALED
+  jnle .nextInvalidCheck1
+  jmp .validRevealed
+
+.nextInvalidCheck1:
+  cmp rsi, ZERO_REVEALED_ITTERATED
+  je .invalidAlreadyRevealed
+  jmp .nextInvalidCheck2
+
+.invalidAlreadyRevealed:
+  mov qword[rbp-8], 4
+  jmp .outputDetermined
+
+.nextInvalidCheck2:
+  cmp rsi, ZERO_FLAGGED
+  jnge .nextInvalidCheck3
+  cmp rsi, REAL_BOMB_FLAG
+  jnle .nextInvalidCheck3
+  jmp .invalidSquareIsFlag
+
+.invalidSquareIsFlag:
+  mov qword[rbp-8], 2
+  jmp .outputDetermined
+
+.nextInvalidCheck3:
+  mov qword[rbp-8], 3
+  jmp .outputDetermined
+
+.valid:
+  cmp rsi, MINE
+  je .setLost
+  jmp .numberUnrevealed
+
+.setLost:
+  mov qword[rbp-8], 2
+  jmp .outputDetermined
+
+.numberUnrevealed:
+  cmp rsi, ZERO_UNREVEALED
+  je .revealZero
+
+  ; valid reveal of unrevealed
+  add qword[rbp-16], 10
+  jmp .outputDetermined
+
+.revealZero:
+  mov rsi, qword[rbp-16]
+  mov qword[rsi], ZERO_REVEALED_ITTERATED
+  jmp .revealSurounding
 
 
+.validRevealed:
+  ; bieng  here implies only numbered reveald above 0
+  push rsi
+  push rdi
+
+  mov rdi, qword[map]
+  mov rsi, qword[currentX]
+  mov rdx, qword[currentY]
+  call countSuroundingFlags
+
+  pop rsi
+  pop rdi
+
+  mov rsi, qword[rbp-16]
+  sub rsi, 10
+  cmp rax, rsi
+  jne .invalidFlagCount
+  jmp .revealSurounding
+
+.invalidFlagCount:
+  mov qword[rsp-8], 5
+  jmp .outputDetermined
+
+.revealSurounding:
+  call revealSuround
+  mov qword[rsp-8], rax
+  jmp .outputDetermined
+
+.outputDetermined:
+  mov rax, qword[rsp-8]
+  add rsp, 32
+  pop r14
+  pop r15
+  pop rbp
+  ret
