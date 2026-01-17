@@ -47,6 +47,7 @@ section .data
   mallocFailedMsg db "Malloc returned null pointer (malloc failure).", 10, "Program exit", 10, 0
   mine db "X ", 0
   noMine db "O ", 0
+  printSquareNumber db "%u ", 0
   newLine db 10, 0
   debugMinelayingAttempt db "Attempting to lay mine at (%u,%u)", 10, 0
 
@@ -89,6 +90,15 @@ minesweeper:
   mov rsi, qword[x]
   mov rdx, qword[y]
   call printMinefield
+
+  mov rdi, newLine
+  xor rax, rax
+  call printf
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldSmart
 
   add rsp, 32
   pop rbp
@@ -392,7 +402,7 @@ je .skipCountCurrentSquare
 .endBoundsCheck:
   ; store r15 (originally y pointer), use now as y pointer for inner loop
   mov qword[rbp - 8], r15
-  cmp r8, 0
+  cmp r8, r14
   je .noDecrement
   jmp .decrement
 
@@ -498,3 +508,76 @@ je .skipCountCurrentSquare
   pop rbp
 
   ret
+
+; rdi - minefield; rsi - x length; rdx - y length; no returns
+; prints minefield to screen, adds color and also displays
+printMinefieldSmart:
+  ; r15 - y pointer; r14 - y length left itterator
+  ; r13 - x pointer; r12 - x length left itterator
+  push rbp
+  push r15
+  push r14
+  push r13
+  push r12
+  mov rbp, rsp
+  sub rsp, 16
+
+  ; original minefield pointer in r15
+  mov r15, rdi
+  ; total y length in r14
+  mov r14,  rdx
+
+  ; total x length
+  mov qword[rbp-8], rsi
+
+.printLoopY:
+  ; set up x pointer
+  mov r13, qword[r15]
+  ; set up x length
+  mov r12, qword[rbp-8]
+
+.printLoopX:
+  ; itterate over the x column
+  cmp byte[r13], MINE
+  je .isMine
+  jmp .notMine
+
+  ; check if mine
+.isMine:
+  mov rdi, mine
+  jmp .printSquare
+
+.notMine:
+  mov rdi, printSquareNumber
+  movzx rsi, byte[r13]
+  jmp .printSquare
+
+  ; print the current square
+.printSquare:
+  xor rax, rax
+  call printf
+
+  ; itterate to the next square
+  inc r13 
+  dec r12
+  jnz .printLoopX
+
+  ; print new line
+  xor rax, rax
+  mov rdi, newLine
+  call printf
+
+  ; end of x loop, itterate over y
+  add r15, 8
+  dec r14
+  jnz .printLoopY
+  
+  add rsp, 16
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  pop rbp
+  ret
+
+
