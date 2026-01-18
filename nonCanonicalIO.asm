@@ -100,7 +100,7 @@ firstMoveFlagWarn db "Can not toggle flag on first move.", 10, 0
 validRevealText db "Revealed square.", 10, 0
 invalidRevealText db "Can not reveal square.", 10, 0
 
-gameWonText db "Congraduations, you won!", 10, "Press q to quit", 10, 0
+gameWonText db "Congratultions, you won!", 10, "Press q to quit", 10, 0
 gameLostText db "You lost! Better luck next time.", 10, "Press q to quit", 10, 0
 
 moveLeftText db "Moved left by %u.", 10, 0
@@ -127,6 +127,9 @@ quitState resb 1
 
 ; forgot to add a game stat in minesweeper.asm
 gameState resb 1
+
+currentCommandCount resb 1
+currentCommand resb 1
 
 section .text
 
@@ -172,6 +175,8 @@ startGame:
 .read_loop:
   call readChar
 
+  mov byte[currentCommand], al
+
   cmp byte[gameState], GAME_WON
   je .checkExit
   cmp byte[gameState], GAME_LOST
@@ -201,6 +206,7 @@ startGame:
   sub al, '0'
   mov dword[prefixNumber], eax
   pop rax
+  mov byte[state], NUMBER_PREFIX
   jmp .finishedProcessing
 
 .numberPrefix:
@@ -398,7 +404,8 @@ startGame:
 .quit1:
   mov byte[quitState], 1
   mov rdi, quitConfirm
-  jmp .validCommand
+  call displayUI
+  jmp .read_loop
 
 .quit2OrAbsY:
   cmp byte[quitState], 1

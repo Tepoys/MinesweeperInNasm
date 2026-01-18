@@ -168,7 +168,7 @@ minesweeper:
   mov qword[x], rdi
   mov qword[y], rsi
 
-  mov byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  mov byte[lineNumberDisplayMode], RELATIVE_LINE_NUMBER
   mov qword[currentX], 0
   mov qword[currentY], 0
 
@@ -1403,8 +1403,8 @@ revealSuround:
   mov rbp, rsp
   sub rsp, 24
 
-  ; rsp-8 is return value
-  mov qword[rsp-8], 0
+  ; rsp-16 is return value
+  mov qword[rbp-16], 0
 
   ; setup for loop
   mov r15, rdi
@@ -1461,13 +1461,7 @@ revealSuround:
 
 .endBoundsCheck:
   ; move r15 based off of y offset
-  push rcx
-  mov eax, 8
-  mov rcx, r8
-  mul ecx
-  pop rcx
-
-  add r15, rax
+  lea r15, [r15 + r8*8]
 
   ; r15 is now min y bounds
 
@@ -1522,9 +1516,9 @@ revealSuround:
   pop rdi
 
   cmp qword[rbp-8], 1
-  je .result
+  jne .iterateX
 
-  mov qword[rbp-8], 0
+  mov qword[rbp-16], 1
   jmp .iterateX
 
 
@@ -1553,7 +1547,7 @@ revealSuround:
   ; r13 - x pointer; r12 - x index
 
   ; move count into square
-  mov rax, qword[rbp-8]
+  mov rax, qword[rbp-16]
 
   add rsp, 24
   pop rbx
@@ -1630,14 +1624,7 @@ countSuroundingFlags:
 
 .endBoundsCheck:
   ; move r15 based off of y offset
-  push rcx
-  mov eax, 8
-  mov rcx, r8
-  mul ecx
-  pop rcx
-
-  add r15, rax
-
+  lea r15, [r15 + r8*8]
   ; r15 is now min y bounds
 
   ; use min bounds for x and y as index (loop until those reach max bounds)
@@ -2150,10 +2137,10 @@ flagWrapper:
 
 reboundY:
   cmp qword[currentY], 0
-  jb .setZero
+  jl .setZero
   mov rdi, qword[y]
   cmp qword[currentY], rdi
-  jae .setMax
+  jge .setMax
   jmp .valid
 
 .setZero:
@@ -2172,10 +2159,10 @@ reboundY:
 
 reboundX:
   cmp qword[currentX], 0
-  jb .setZero
+  jl .setZero
   mov rdi, qword[x]
   cmp qword[currentX], rdi
-  jae .setMax
+  jge .setMax
   jmp .valid
 
 .setZero:
@@ -2237,7 +2224,7 @@ displayUI:
   mov r15, rdi
   mov r14, rsi
 
-  ; call setCursorPositionHome
+  call setCursorPositionHome
 
   mov rdi, flagCounter
   movzx rsi, dword[flagCount]
@@ -2253,8 +2240,8 @@ displayUI:
   xor rax, rax
   call printf
 
-  ; mov rdi, moveToColOne
-  ; call printf
+  mov rdi, moveToColOne
+  call printf
 
   mov rdi, r15
   mov rsi, r14
