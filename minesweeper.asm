@@ -93,6 +93,8 @@ section .data
   space db "[ ]", 0
   returnValue db "Return value of: %u", 10, 0
   userHasWonValue db "User hasWon value: %u", 10, 0
+  revealTriedText db "Tried reveal on (%u,%u)", 10, 0
+  flagTriedText db "Tried flag on (%u,%u)", 10, 0
   error db "This was not supposed to happen, for debug purposes only.", 0
 
 
@@ -113,9 +115,7 @@ section .text
 ; rdi - minesweeper x length; rsi - minesweeper y length; rdx - minesweeper mine count
 minesweeper:
   push rbp
-
   mov rbp, rsp
-  sub rsp, 32
 
   mov qword[x], rdi
   mov qword[y], rsi
@@ -158,7 +158,69 @@ minesweeper:
   mov qword[currentY], 5
   call printMinefieldWithColor
 
-debug1:
+  ; call revealTestCases
+  call revealAndFlagTestCase
+
+  pop rbp
+  ret
+
+revealAndFlagTestCase:
+  push rbp
+
+  mov rax, 0
+  mov rdi, newLine
+
+  mov rdi, 5
+  mov rsi, 5
+  call testRevealDebug
+
+  mov rdi, 0
+  mov rsi, 0
+  call  testRevealDebug
+
+  mov rdi, 1
+  mov rsi, 3
+  call testFlagDebug
+
+  mov rdi, 1
+  mov rsi, 4
+  call testRevealDebug
+
+  mov rdi, 1
+  mov rsi, 7
+  call testFlagDebug
+
+  mov rdi, 0
+  mov rsi, 7
+  call testFlagDebug
+
+  mov rdi, 2
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 1
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 5
+  mov rsi, 4
+  call testFlagDebug
+
+  mov rdi, 5
+  mov rsi, 3
+  call testRevealDebug
+
+  pop rbp
+  ret
+
+
+
+revealTestCases:
+  push rbp
+
+  mov rax, 0
+  mov rdi, newLine
+
   mov rdi, 5
   mov rsi, 5
   call testRevealDebug
@@ -215,15 +277,25 @@ debug1:
   mov rsi, 0
   call testRevealDebug
 
-
-
-  add rsp, 32
   pop rbp
   ret
 
 ; rdi - x; rsi - y
 testRevealDebug:
   push rbp
+
+  mov qword[currentX], rdi
+  mov qword[currentY], rsi
+
+  push rdi
+  push rsi
+  mov rdx, rsi
+  mov rsi, rdi
+  mov rdi, revealTriedText
+  call printf
+  pop rsi
+  pop rdi
+
   call revealSquare
 
   mov rsi, rax
@@ -240,8 +312,6 @@ testRevealDebug:
   mov rdi, qword[map]
   mov rsi, qword[x]
   mov rdx, qword[y]
-  mov qword[currentX], 5
-  mov qword[currentY], 5
   call printMinefieldWithColor
 
   mov rdi, newLine
@@ -255,6 +325,53 @@ testRevealDebug:
 
   pop rbp
   ret
+
+; rdi - x; rsi - y
+testFlagDebug:
+  push rbp
+
+  mov qword[currentX], rdi
+  mov qword[currentY], rsi
+
+  push rdi
+  push rsi
+  mov rdx, rsi
+  mov rsi, rdi
+  mov rdi, flagTriedText
+  call printf
+  pop rsi
+  pop rdi
+
+  call toggleFlag
+
+  mov rsi, rax
+  mov rdi, returnValue
+  xor rax, rax
+  call printf
+
+  call hasWon
+  mov rsi, rax
+  mov rdi, userHasWonValue
+  xor rax, rax
+  call printf
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldWithColor
+
+  mov rdi, newLine
+  xor rax, rax
+  call printf
+  
+  ; mov rdi, qword[map]
+  ; mov rsi, qword[x]
+  ; mov rdx, qword[y]
+  ; call printMinefieldSmart
+
+  pop rbp
+  ret
+
 
 
 ; mines represented in the array by -1
@@ -1502,6 +1619,94 @@ hasWon:
 
 .end:
   mov rax, r13
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  pop rbp
+  ret
+
+; rdi - x
+; rsi - y
+; return:
+;   0: toggledFlag
+;   1: unableToTogle/InvalidToggle
+toggleFlag:
+  push rbp
+  push r15
+  push r14
+  push r13
+  push r12
+  mov rbp, rsp
+  ; use r12 as return value
+  mov r12, 0
+
+  ; find row
+  lea rcx, [rsi*8]
+  mov r15, qword[map]
+
+  add r15, rcx
+
+  ; move row pointer to r14
+  mov r14, qword[r15]
+  
+  ; find square pointer
+  add r14, rdi
+  ; load data into r13; r14 has pointer
+  movzx r13, byte[r14]
+
+  ; check if square is revealed
+  cmp r13b, ZERO_REVEALED_ITERATED
+  jl .notRevealed
+  cmp r13b, EIGHT_REVEALED
+  jg .notRevealed
+  jmp .invalid
+
+.invalid:
+  mov r12, 1
+  jmp .end
+
+.notRevealed:
+  cmp r13b, ZERO_UNREVEALED
+  jl .notUnrevealed
+  cmp r13b, EIGHT_UNREVEALED
+  jg .notUnrevealed
+  jmp .unrevealed
+  
+.unrevealed:
+  ; flag current square
+  add byte[r14], 20
+  jmp .end
+
+.notUnrevealed:
+  cmp r13b, ZERO_FLAGGED
+  jl .notFlaggedNumber
+  cmp r13b, EIGHT_FLAGGED
+  jg .notFlaggedNumber
+  jmp .flagged
+
+.flagged:
+  ; unflag current square
+  sub byte[r14], 20
+  jmp .end
+
+.notFlaggedNumber:
+  cmp r13b, REAL_BOMB_FLAG
+  je .flaggedMine
+  cmp r13b, MINE
+  je .unflaggedMine
+  jmp .invalid
+
+.flaggedMine:
+  mov byte[r14], MINE
+  jmp .end
+
+.unflaggedMine:
+  mov byte[r14], REAL_BOMB_FLAG
+  jmp .end
+
+.end:
+  mov rax, r12
   pop r12
   pop r13
   pop r14
