@@ -92,6 +92,7 @@ section .data
   reset db 0x1B, "[0m", 0
   space db "[ ]", 0
   returnValue db "Return value of: %u", 10, 0
+  userHasWonValue db "User hasWon value: %u", 10, 0
   error db "This was not supposed to happen, for debug purposes only.", 0
 
 
@@ -166,6 +167,56 @@ debug1:
   mov rsi, 0
   call  testRevealDebug
 
+  mov rdi, 0
+  mov rsi, 3
+  call testRevealDebug
+
+  mov rdi, 8
+  mov rsi, 3
+  call testRevealDebug
+
+  mov rdi, 0
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 1
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 5
+  mov rsi, 6
+  call testRevealDebug
+
+  mov rdi, 5
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 6
+  mov rsi, 7
+  call testRevealDebug
+
+  mov rdi, 6
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 7
+  mov rsi, 8
+  call testRevealDebug
+
+  mov rdi, 8
+  mov rsi, 1
+  call testRevealDebug
+
+  mov rdi, 8
+  mov rsi, 0
+  call testRevealDebug
+
+  mov rdi, 7
+  mov rsi, 0
+  call testRevealDebug
+
+
+
   add rsp, 32
   pop rbp
   ret
@@ -180,7 +231,9 @@ testRevealDebug:
   xor rax, rax
   call printf
 
-  mov rdi, newLine
+  call hasWon
+  mov rsi, rax
+  mov rdi, userHasWonValue
   xor rax, rax
   call printf
 
@@ -194,11 +247,11 @@ testRevealDebug:
   mov rdi, newLine
   xor rax, rax
   call printf
-
-  mov rdi, qword[map]
-  mov rsi, qword[x]
-  mov rdx, qword[y]
-  call printMinefieldSmart
+  
+  ; mov rdi, qword[map]
+  ; mov rsi, qword[x]
+  ; mov rdx, qword[y]
+  ; call printMinefieldSmart
 
   pop rbp
   ret
@@ -1366,6 +1419,83 @@ revealSquare:
 .outputDetermined:
   mov rax, qword[rbp-8]
   add rsp, 32
+  pop r14
+  pop r15
+  pop rbp
+  ret
+
+; no arguments; checks entire board to see if user has won
+; returns:
+;   1: user won
+;   0: not won
+hasWon:
+  push rbp
+  push r15
+  push r14
+  push r13
+  push r12
+  mov rbp, rsp
+
+  mov r13, 1
+
+  ; y pointer
+  mov rax, qword[map]
+  ; y index
+  mov r14, 0
+  
+.yLoop:
+  ; x index
+  mov r15, 0
+  ; x pointer
+  mov rdi, qword[rax]
+
+.xLoop:
+  ; if user has uncovered a bomb, they have not won
+  cmp byte[rdi], BOMB_REVEALED
+  je .notWon
+
+  ; if user has unrevealed, then they have not won yet
+  cmp byte[rdi], ZERO_UNREVEALED
+  jl .notUnrevealed
+  cmp byte[rdi], EIGHT_UNREVEALED
+  jg .notUnrevealed
+  jmp .notWon
+
+.notUnrevealed:
+  ; if user has false flags, they have not won
+  cmp byte[rdi], ZERO_FLAGGED
+  jl .notFalseFlagged
+  cmp byte[rdi], EIGHT_FLAGGED
+  jg .notFalseFlagged
+  jmp .notWon
+
+.notFalseFlagged:
+  ; if niether of the three conditions are true, check next square
+  jmp .itterateX
+
+.itterateX:
+  inc rdi
+  inc r15
+  cmp r15, qword[x]
+  jl .xLoop
+
+.itterateY:
+  add rax, 8
+  inc r14
+  cmp r14, qword[y]
+  jl .yLoop
+  
+  ;end of loop goto end
+  jmp .end
+  
+.notWon:
+  mov r13, 0
+  jmp .end
+
+.end:
+  mov rax, r13
+  pop r12
+  pop r13
   pop r14
   pop r15
   pop rbp
