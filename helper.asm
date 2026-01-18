@@ -24,6 +24,8 @@ global seedRand
 ; rdi - lower bound; rsi - upper bound; no return
 global getRand
 
+global setCursorPositionHome
+
 extern getchar
 extern printf
 extern scanf
@@ -40,6 +42,7 @@ section .data
   invalidInputWarn db "Invalid input, try again.", 10, 0
   tooLowWarn db "Your input was too low (min: %d)", 10, 0
   tooHighWarn db "Your input was too high (max: %d)", 10, 0
+  resetCursorPosition db 0x1B, "[H", 0
 
 section .bss
   input resb 1
@@ -236,5 +239,15 @@ getRand:
   mov eax, edx
 
   add rsp, 16
+  pop rbp
+  ret
+
+setCursorPositionHome:
+  push rbp
+
+  mov rdi, resetCursorPosition
+  xor rax, rax
+  call printf
+
   pop rbp
   ret

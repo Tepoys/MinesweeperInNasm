@@ -38,10 +38,31 @@ DEFAULT ABS
 %define ICANON 0x0002
 %define ECHO   0x0008
 
+%define GAME_IDLE 0
+%define GAME_LOST 1
+%define GAME_WON 2
+
 extern printf
 
-
 extern clearScreen
+
+; import all UI related minesweeper functions
+extern revealWrapper
+extern flagWrapper
+
+extern moveLeftMinesweeper
+extern moveRightMinesweeper
+extern moveDownMinesweeper
+extern moveUpMinesweeper
+
+extern toX
+extern toY
+
+extern displayUI
+
+extern hasWon
+
+global startGame
 
 section .text
 helpText db "This is the help menu, you can exit by pressing any key.", 10
@@ -61,14 +82,34 @@ helpText db "This is the help menu, you can exit by pressing any key.", 10
          db "    - by itself will move to column 0", 10, 10
          db "'y' - moves to a specific row", 10
          db "    - by itself will move to row 0", 10, 10
-         db "-- Minesweeper actions"
+         db "-- Minesweeper actions", 10
          db "'f' - flags the highlighted square (if possible)", 10, 10
          db "'g' - reveals the highlighted square (if possible)", 10
          db "---------------------------------------------------------", 10
          db "Press any key to continue", 10, 0
-mask db "                                                    ", 0
-reminder db "You can press 'a' to view the list of commands.", 0
-quitConfirm db "Are you sure you want to quit (press y).", 0
+mask db "                                                    ", 10, 0
+reminder db "You can press 'a' to view the list of commands.", 10, 0
+quitConfirm db "Are you sure you want to quit (press y).", 10, 0
+
+
+; input reactions ----
+successToggleFlag db "Toggled flag.", 10, 0
+failureToggleFlag db "Can not flag current square.", 10, 0
+firstMoveFlagWarn db "Can not toggle flag on first move.", 10, 0
+
+validRevealText db "Revealed square.", 10, 0
+invalidRevealText db "Can not reveal square.", 10, 0
+
+gameWonText db "Congraduations, you won!", 10, "Press q to quit", 10, 0
+gameLostText db "You lost! Better luck next time.", 10, "Press q to quit", 10, 0
+
+moveLeftText db "Moved left by %u.", 10, 0
+moveRightText db "Moved right by %u.", 10, 0
+moveUpText db "Moved up by %u.", 10, 0
+moveDownText db "Moved down by %u.", 10, 0
+
+movedToY db "Moved to y=%d", 10, 0
+movedToX db "Moved to x=%d", 10, 0
 
 section .bss
 ; termios settings
@@ -83,6 +124,9 @@ state resb 1
 prefixNumber resd 1
 inputFailCount resb 1
 quitState resb 1
+
+; forgot to add a game stat in minesweeper.asm
+gameState resb 1
 
 section .text
 
@@ -116,9 +160,30 @@ startGame:
   mov rdx, termios_new
   syscall
 
+  mov byte[gameState], GAME_IDLE
+  mov dword[prefixNumber], 0
+  mov byte[inputFailCount], 0
+  mov byte[quitState], 0
+  mov byte[state], IDLE
+
+  mov rdi, mask
+  call displayUI
+
 .read_loop:
   call readChar
 
+  cmp byte[gameState], GAME_WON
+  je .checkExit
+  cmp byte[gameState], GAME_LOST
+  je .checkExit
+  jmp .continueCheckInput
+
+.checkExit:
+  cmp al, 'q'
+  je .quitCurrentGame
+  jmp .read_loop
+
+.continueCheckInput:
   cmp al, '0'
   jb .notNumber
   cmp al, '9'
@@ -191,43 +256,142 @@ startGame:
 
   cmp al, DOWN
   je .moveDown
+  jmp .invalidInput
 
 .moveDown:
-  ; TODO
+  movzx rdi, dword[prefixNumber]
+  cmp rdi, 0
+  jne .normalDown
+  inc rdi
+.normalDown:
+  mov dword[prefixNumber], edi
+  call moveDownMinesweeper
+  mov rdi, moveDownText
+  mov esi, dword[prefixNumber]
   jmp .validCommand
 
 .moveUp:
-  ; TODO
+  movzx rdi, dword[prefixNumber]
+  cmp rdi, 0
+  jne .normalUp
+  inc rdi
+.normalUp:
+  mov dword[prefixNumber], edi
+  call moveUpMinesweeper
+  mov rdi, moveUpText
+  mov esi, dword[prefixNumber]
   jmp .validCommand
 
-
 .moveRight:
-  ; TODO
+  movzx rdi, dword[prefixNumber]
+  cmp rdi, 0
+  jne .normalRight
+  inc rdi
+.normalRight:
+  mov dword[prefixNumber], edi
+  call moveRightMinesweeper
+  mov rdi, moveRightText
+  mov esi, dword[prefixNumber]
   jmp .validCommand
 
 .moveLeft:
-  ; TODO
+  movzx rdi, dword[prefixNumber]
+  cmp rdi, 0
+  jne .normalLeft
+  inc rdi
+.normalLeft:
+  mov dword[prefixNumber], edi
+  call moveLeftMinesweeper
+  mov rdi, moveLeftText
+  mov esi, dword[prefixNumber]
   jmp .validCommand
+
+;----------------------------------------
 
 .flagCurrentSquare:
-  ; TODO
+  call flagWrapper
+
+  cmp rax, 2
+  je .firstMoveFlag
+
+  cmp rax, 0
+  je .toggleSuccess
+  mov rdi, failureToggleFlag
+  jmp .endFlagCurrentSquare
+
+.toggleSuccess:
+  mov rdi, successToggleFlag
+  jmp .endFlagCurrentSquare
+
+.firstMoveFlag:
+  mov rdi, firstMoveFlagWarn
+  jmp .endFlagCurrentSquare
+
+.endFlagCurrentSquare:
   jmp .validCommand
+
+;----------------------------------------
 
 .revealCurrentSquare:
-  ;TODO
+  call revealWrapper
+
+  cmp rax, 1
+  je .gameLost
+
+  cmp rax, 0
+  je .validReveal
+  jmp .invalidReveal
+
+.validReveal:
+  mov rdi, validRevealText
+  call hasWon
+  cmp rax, 1
+  je .gameWon
+  mov rdi, validRevealText
+  jmp .endRevealCurrentSquare
+
+.invalidReveal:
+  mov rdi, invalidRevealText
+  jmp .endRevealCurrentSquare
+
+.endRevealCurrentSquare:
   jmp .validCommand
+
+;----------------------------------------
 
 .absY:
-  ; TODO
+  movzx rdi, dword[prefixNumber]
+  call toY
+  mov rdi, movedToY
+  movzx rsi, dword[prefixNumber]
   jmp .validCommand
+
+;----------------------------------------
 
 .absX:
-  ; TODO
+  movzx rdi, dword[prefixNumber]
+  call toX
+  mov rdi, movedToX
+  movzx rsi, dword[prefixNumber]
   jmp .validCommand
 
+;----------------------------------------
+
+
+.gameLost:
+  mov byte[gameState], GAME_LOST
+  mov rdi, gameLostText
+  call displayUI
+  jmp .read_loop
+
+.gameWon:
+  mov byte[gameState], GAME_WON
+  mov rdi, gameWonText
+  call displayUI
+  jmp .read_loop
 
 .displayHelp:
-  ; call help
+  call help
   mov rdi, reminder
   jmp .validCommand
 
@@ -255,9 +419,14 @@ startGame:
 
 .firstInvalid:
   mov rdi, mask
-  jmp .validCommand
+  jmp .read_loop
 
 .validCommand:
+  call displayUI
+  mov dword[prefixNumber], 0
+  mov byte[inputFailCount], 0
+  mov byte[quitState], 0
+  mov byte[state], IDLE
   jmp .read_loop
 
 .quitCurrentGame:
@@ -269,7 +438,7 @@ startGame:
   mov rax, SYS_IOCTL
   mov rdi, STDIN
   mov rsi, TCSETS
-  mov rdx, termios_new
+  mov rdx, termios_old
   syscall
 
   pop rbp
@@ -283,6 +452,9 @@ help:
   call clearScreen
   mov rdi, helpText
   call printf
+
+  call readChar
+  call clearScreen
 
   pop rbp
   ret

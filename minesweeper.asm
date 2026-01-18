@@ -54,11 +54,41 @@ global generateMines
 ; prints minefield to screen
 global printMinefield
 
+; no arguments
+; generates the map upon first reveal (to make sure you dont land on a mine)
+; calls revealSquare on current square
+; same return code as revealSquare
+global revealWrapper
+
+
+; returns
+; 0: toggled flag
+; 1: unable to toggle flag
+; 2: can not toggle first move
+global flagWrapper
+
+global moveLeftMinesweeper
+global moveRightMinesweeper
+global moveDownMinesweeper
+global moveUpMinesweeper
+
+global toX
+global toY
+
+global hasWon
+
+global displayUI
+
+extern startGame
+
 extern printf
 extern malloc
 extern free
 
+extern clearScreen
+extern flushSTDOUT
 extern getRand
+extern setCursorPositionHome
 
 section .data
   mallocFailedMsg db "Malloc returned null pointer (malloc failure).", 10, "Program exit", 10, 0
@@ -105,10 +135,14 @@ section .data
   userHasWonValue db "User hasWon value: %u", 10, 0
   revealTriedText db "Tried reveal on (%u,%u)", 10, 0
   flagTriedText db "Tried flag on (%u,%u)", 10, 0
-  error db "This was not supposed to happen, for debug purposes only.", 0
+  error db "This was not supposed to happen, for debug purposes only.", 10, 0
+  flagCounter db "Flags left: %-5d", 10, 0
+  mask db "                                                          ", 0
+  moveToColOne db 0x1B, "[1G", 0
 
 section .bss
   map resq 1
+
   ; dword since they can go negative (and default int is 32 bit)
   mineCount resd 1
   flagCount resd 1
@@ -120,6 +154,9 @@ section .bss
   allocState resq 1
 
   lineNumberDisplayMode resb 1
+
+  ; 0 if not first move, 1 if first move
+  firstMoveBool resb 1
 
 section .text
 
@@ -137,6 +174,82 @@ minesweeper:
 
   call generateMines
   mov qword[map], rax
+
+  call startGame
+
+  pop rbp
+  ret
+
+firstRevealTest:
+  push rbp
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefield
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldSmart
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldWithColor
+
+  mov qword[currentX], 6
+  mov qword[currentY], 1
+  call revealWrapper
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefield
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldSmart
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldWithColor
+
+  mov qword[currentX], 7
+  mov qword[currentY], 1
+  call revealWrapper
+
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefield
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldSmart
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldWithColor
+
+  call clearScreen
+  mov rdi, newLine
+  call displayUI
+
+  mov rdi, mallocFailedMsg
+  call displayUI
+  
+  pop rbp
+  ret
+
+
+test1:
+  push rbp
 
   mov rdi, qword[map]
   mov rsi, qword[x]
@@ -178,6 +291,7 @@ minesweeper:
 
   pop rbp
   ret
+
 
 revealAndFlagTestCase:
   push rbp
@@ -227,8 +341,6 @@ revealAndFlagTestCase:
 
   pop rbp
   ret
-
-
 
 revealTestCases:
   push rbp
@@ -398,6 +510,10 @@ generateMines:
 
   mov rbp, rsp
   sub rsp, 32
+
+  mov byte[firstMoveBool], 1
+  mov dword[mineCount], edx
+  mov dword[flagCount], edx
   
   mov qword[allocState], MINE
   
@@ -953,7 +1069,7 @@ printMinefieldWithColor:
   mov rax, 0
   call printf
 
-  cmp qword[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  cmp byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
   je .incrementRowNumber
   jmp .adjustRowNumber
 
@@ -1166,6 +1282,7 @@ printMinefieldWithColor:
   dec r14
   jnz .printLoopY
 
+; end of normal print loop, now we print column line number
 .printColumnNumber:
   mov qword[rbp-24], 0
 
@@ -1231,7 +1348,7 @@ printMinefieldWithColor:
   mov rax, 0
   call printf
 
-  cmp qword[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  cmp byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
   je .ColIncrementColNumber
   jmp .ColAdjustColNumber
 
@@ -1259,6 +1376,10 @@ printMinefieldWithColor:
   mov rax, qword[x]
   cmp qword[rbp-24], rax
   jl .columnNumberLoop
+
+  mov rdi, newLine
+  mov rax, 0
+  call printf
 
 .exitPrintWithColor:
   add rsp, 24
@@ -1866,6 +1987,7 @@ toggleFlag:
 .unrevealed:
   ; flag current square
   add byte[r14], 20
+  inc dword[flagCount]
   jmp .end
 
 .notUnrevealed:
@@ -1878,6 +2000,7 @@ toggleFlag:
 .flagged:
   ; unflag current square
   sub byte[r14], 20
+  dec dword[flagCount]
   jmp .end
 
 .notFlaggedNumber:
@@ -1889,16 +2012,256 @@ toggleFlag:
 
 .flaggedMine:
   mov byte[r14], MINE
+  inc dword[flagCount]
   jmp .end
 
 .unflaggedMine:
   mov byte[r14], REAL_BOMB_FLAG
+  dec dword[flagCount]
   jmp .end
 
 .end:
   mov rax, r12
   pop r12
   pop r13
+  pop r14
+  pop r15
+  pop rbp
+  ret
+
+; no arguments
+; generates the map upon first reveal (to make sure you dont land on a mine)
+; calls revealSquare on current square
+; same return code as revealSquare
+revealWrapper:
+  push rbp
+  
+  cmp byte[firstMoveBool], 0
+  je .notFirstMove
+
+  ; find row
+  mov r11, qword[map]
+  mov r10, qword[currentY]
+  lea r9, [r10*8 + r11]
+
+  ; find square
+  mov r11, qword[r9]
+  mov r10, qword[currentX]
+  lea r9, [r11 + r10]
+  movzx r8, byte[r9]
+
+  cmp r8b, MINE
+  je .reallocateMine
+  jmp .countMines
+
+.reallocateMine:
+  mov byte[r9], 0
+
+  ; find next empty square
+  ; y
+  mov r11, qword[map]
+  mov r10, 0
+
+.loopY:
+  ; x
+  mov r9, qword[r11]
+  mov r8, 0
+
+.loopX:
+  
+  ; check the square we are on is not highlighted
+  cmp r10, qword[currentY]
+  jne .notCurrentSquare
+  cmp r8, qword[currentX]
+  jne .notCurrentSquare
+  jmp .nextX
+
+.notCurrentSquare:
+  ; check the square does not already have mine
+  cmp byte[r9], MINE
+  je .nextX
+
+  ; we can now set this square as mine
+  mov byte[r9], MINE
+  jmp .finishedAllocateMine
+.nextX:
+  inc r9
+  inc r8
+  cmp r8, qword[x]
+  jl .loopX
+
+.nextY:
+  add r11, 8
+  inc r10
+  cmp r10, qword[y]
+  jl .loopY
+
+  ;the code should never get here
+  
+.finishedAllocateMine:
+jmp .countMines
+
+.countMines:
+  mov byte[firstMoveBool], 0
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call countMines
+  jmp .normalReveal
+
+
+
+.notFirstMove:
+.normalReveal:
+
+  mov rdi , qword[currentX]
+  mov rsi, qword[currentY]
+  call revealSquare
+  ; pass on return code
+  
+  pop rbp
+  ret
+
+
+
+; returns
+; 0: toggled flag
+; 1: unable to toggle flag
+; 2: can not toggle first move
+flagWrapper:
+  push rbp
+
+  cmp byte[firstMoveBool], 0
+  je .normalToggle
+  
+  ; tell user you can not toggle flag first move
+  mov rax, 2
+  jmp .exit
+
+  .normalToggle:
+  mov rdi, qword[currentX]
+  mov rsi, qword[currentY]
+  call toggleFlag
+  jmp .exit
+
+  .exit:
+  pop rbp
+  ret
+
+reboundY:
+  cmp qword[currentY], 0
+  jb .setZero
+  mov rdi, qword[y]
+  cmp qword[currentY], rdi
+  jae .setMax
+  jmp .valid
+
+.setZero:
+  mov qword[currentY], 0
+  jmp .valid
+
+.setMax:
+  mov rdi, qword[y]
+  dec rdi
+  mov qword[currentY], rdi
+  jmp .valid
+
+.valid:
+  ret
+
+
+reboundX:
+  cmp qword[currentX], 0
+  jb .setZero
+  mov rdi, qword[x]
+  cmp qword[currentX], rdi
+  jae .setMax
+  jmp .valid
+
+.setZero:
+  mov qword[currentX], 0
+  jmp .valid
+
+.setMax:
+  mov rdi, qword[x]
+  dec rdi
+  mov qword[currentX], rdi
+  jmp .valid
+
+.valid:
+  ret
+
+; rdi - how many to move left by
+moveLeftMinesweeper:
+  sub qword[currentX], rdi
+  call reboundX
+  ret
+
+; rdi - how many to move right by
+moveRightMinesweeper:
+  add qword[currentX], rdi
+  call reboundX
+  ret
+
+; rdi - how much to move down by
+moveDownMinesweeper:
+  add qword[currentY], rdi
+  call reboundY
+  ret
+
+; rdi - how much to move Up by
+moveUpMinesweeper:
+  sub qword[currentY], rdi
+  call reboundY
+  ret
+
+; rdi - where to move x to
+toX:
+  mov qword[currentX], rdi
+  call reboundX
+  ret
+
+; rdi - where to move Y to
+toY:
+  mov qword[currentY], rdi
+  call reboundY
+  ret
+
+; rdi - user response text; rsi - secondary user response input as needed
+; display all nessasary user input
+displayUI:
+  push rbp
+  push r15
+  push r14
+
+  mov r15, rdi
+  mov r14, rsi
+
+  ; call setCursorPositionHome
+
+  mov rdi, flagCounter
+  movzx rsi, dword[flagCount]
+  xor rax, rax
+  call printf
+
+  mov rdi, qword[map]
+  mov rsi, qword[x]
+  mov rdx, qword[y]
+  call printMinefieldWithColor
+
+  mov rdi, mask
+  xor rax, rax
+  call printf
+
+  ; mov rdi, moveToColOne
+  ; call printf
+
+  mov rdi, r15
+  mov rsi, r14
+  xor rax, rax
+  call printf
+  call flushSTDOUT
+
   pop r14
   pop r15
   pop rbp
