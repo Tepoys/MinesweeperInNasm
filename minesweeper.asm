@@ -17,7 +17,7 @@ DEFAULT ABS
 %define EIGHT_UNREVEALED 8
 ; %define ZERO_REVEALED 10
 ; for itterating over 0 chunks to auto display numbers
-%define ZERO_REVEALED_ITTERATED 10
+%define ZERO_REVEALED_ITERATED 10
 %define ONE_REVEALED 11
 %define TWO_REVEALED 12
 %define THREE_REVEALED 13
@@ -432,7 +432,7 @@ printMinefield:
   mov r12, qword[rbp-8]
 
 .printLoopX:
-  ; itterate over the x column
+  ; iterate over the x column
   cmp byte[r13], MINE
   je .isMine
   jmp .notMine
@@ -451,7 +451,7 @@ printMinefield:
   xor rax, rax
   call printf
 
-  ; itterate to the next square
+  ; iterate to the next square
   inc r13 
   dec r12
   jnz .printLoopX
@@ -461,7 +461,7 @@ printMinefield:
   mov rdi, newLine
   call printf
 
-  ; end of x loop, itterate over y
+  ; end of x loop, iterate over y
   add r15, 8
   dec r14
   jnz .printLoopY
@@ -591,7 +591,7 @@ je .skipCountCurrentSquare
 .mineCountingLoopX:
   cmp byte[rax], MINE
   je .hasMine
-  jmp .itterateX
+  jmp .iterateX
 
 .hasMine:
   ; this is not needed on second thought
@@ -599,14 +599,14 @@ je .skipCountCurrentSquare
   ; cmp rbx, rsi
   ; jne .incrementMineCounter
   ; cmp r8, rdx
-  ; je .itterateX
+  ; je .iterateX
   ; jmp .incrementMineCounter
 
 ; .incrementMineCounter:
   inc qword[rbp - 32]
-  jmp .itterateX
+  jmp .iterateX
 
-.itterateX:
+.iterateX:
   ; increment pointer
   inc rax
   ; increment index
@@ -615,7 +615,7 @@ je .skipCountCurrentSquare
   cmp rbx, rcx
   jle .mineCountingLoopX
 
-.itterateY:
+.iterateY:
   ; move to the next x row
   add r15, 8
   ; increment index
@@ -637,14 +637,14 @@ je .skipCountCurrentSquare
   mov byte[r13], al
 
 .skipCountCurrentSquare:
-.itterateMainX:
+.iterateMainX:
   inc r12
   inc r13
 
   cmp r12, rsi
   jl .mainXLoop
 
-.itterateMainY:
+.iterateMainY:
   add r15, 8
   inc r14
 
@@ -690,7 +690,7 @@ printMinefieldSmart:
   mov r12, qword[rbp-8]
 
 .printLoopX:
-  ; itterate over the x column
+  ; iterate over the x column
   cmp byte[r13], MINE
   je .isMine
   jmp .notMine
@@ -710,7 +710,7 @@ printMinefieldSmart:
   xor rax, rax
   call printf
 
-  ; itterate to the next square
+  ; iterate to the next square
   inc r13 
   dec r12
   jnz .printLoopX
@@ -720,7 +720,7 @@ printMinefieldSmart:
   mov rdi, newLine
   call printf
 
-  ; end of x loop, itterate over y
+  ; end of x loop, iterate over y
   add r15, 8
   dec r14
   jnz .printLoopY
@@ -792,7 +792,7 @@ printMinefieldWithColor:
   jmp .notFlagged
 
 .notFlagged:
-  cmp byte[r13], ZERO_REVEALED_ITTERATED
+  cmp byte[r13], ZERO_REVEALED_ITERATED
   je .hasZero
   cmp byte[r13], ONE_REVEALED
   je .hasOne
@@ -938,7 +938,7 @@ printMinefieldWithColor:
   mov rdi, reset
   call printf
 
-  ; itterate to the next square
+  ; iterate to the next square
   inc r13 
   inc qword[rbp - 16]
   dec r12
@@ -949,7 +949,7 @@ printMinefieldWithColor:
   mov rdi, newLine
   call printf
 
-  ; end of x loop, itterate over y
+  ; end of x loop, iterate over y
   add r15, 8
   inc qword[rbp  - 24]
   dec r14
@@ -1059,15 +1059,15 @@ revealSuround:
   jne .differentXCord
   cmp r8, rdx
   jne .differentYCord
-  je .itterateX
+  je .iterateX
 
 
 .differentYCord:
 .differentXCord:
-  cmp byte[rax], ZERO_REVEALED_ITTERATED
-  jge .itterateX
+  cmp byte[rax], ZERO_REVEALED_ITERATED
+  jge .iterateX
   ; cmp byte[rax], ONE_REVEALED
-  ; jge .itterateX
+  ; jge .iterateX
 
   push rdi
   push rsi
@@ -1097,10 +1097,10 @@ revealSuround:
   je .result
 
   mov qword[rbp-8], 0
-  jmp .itterateX
+  jmp .iterateX
 
 
-.itterateX:
+.iterateX:
   ; increment pointer
   inc rax
   ; increment index
@@ -1109,7 +1109,7 @@ revealSuround:
   cmp rbx, rcx
   jle .flagCountingLoopX
 
-.itterateY:
+.iterateY:
   ; move to the next x row
   add r15, 8
   ; increment index
@@ -1226,20 +1226,28 @@ countSuroundingFlags:
   add rax, rbx
 
 .flagCountingLoopX:
+  ;ignore if square = current square
+  cmp r8, rdx
+  jne .checkFlag
+  cmp rbx, rsi
+  jne .checkFlag
+  jmp .iterateX
+
+.checkFlag:
   cmp byte[rax], ZERO_FLAGGED
-  jnge .itterateX
+  jnge .iterateX
   cmp byte[rax], EIGHT_FLAGGED
   jle .hasFlag
   cmp byte[rax], REAL_BOMB_FLAG
   je .hasFlag
-  jmp .itterateX
+  jmp .iterateX
 
 .hasFlag:
   ; .incrementMineCounter:
   inc qword[rbp - 16]
-  jmp .itterateX
+  jmp .iterateX
 
-.itterateX:
+.iterateX:
   ; increment pointer
   inc rax
   ; increment index
@@ -1248,7 +1256,7 @@ countSuroundingFlags:
   cmp rbx, rcx
   jle .flagCountingLoopX
 
-.itterateY:
+.iterateY:
   ; move to the next x row
   add r15, 8
   ; increment index
@@ -1334,7 +1342,7 @@ revealSquare:
   jmp .validRevealed
 
 .nextInvalidCheck1:
-  cmp sil, ZERO_REVEALED_ITTERATED
+  cmp sil, ZERO_REVEALED_ITERATED
   je .invalidAlreadyRevealed
   jmp .nextInvalidCheck2
 
@@ -1380,7 +1388,7 @@ revealSquare:
 
 .revealZero:
   mov rsi, qword[rbp-16]
-  mov byte[rsi], ZERO_REVEALED_ITTERATED
+  mov byte[rsi], ZERO_REVEALED_ITERATED
   jmp .revealSurounding
 
 
@@ -1471,15 +1479,15 @@ hasWon:
 
 .notFalseFlagged:
   ; if niether of the three conditions are true, check next square
-  jmp .itterateX
+  jmp .iterateX
 
-.itterateX:
+.iterateX:
   inc rdi
   inc r15
   cmp r15, qword[x]
   jl .xLoop
 
-.itterateY:
+.iterateY:
   add rax, 8
   inc r14
   cmp r14, qword[y]
