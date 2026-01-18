@@ -40,6 +40,10 @@ DEFAULT ABS
 %define BOMB_REVEALED 30
 %define REAL_BOMB_FLAG 29
 
+%define RELATIVE_LINE_NUMBER 0
+%define ABSOLUTE_LINE_NUMBER 1
+%define DISABLE_PRINT 2
+
 ; rdi - minesweeper x length; rsi - minesweeper y length; rdx - minesweeper mine count
 global minesweeper
 
@@ -90,13 +94,18 @@ section .data
   eight db 0x1B, "[38;5;250m", 0
   eightText db "[8]", 0
   reset db 0x1B, "[0m", 0
-  space db "[ ]", 0
+  invertColors db 0x1B, "[7m", 0
+  boarder db 0x1B, "[48;5;235m", 0x1B, "[38;5;240m", 0
+  boarderYArrow db " > ", 0
+  boarderXArrow db " ^ ", 0
+  ; left aligned 2 number
+  boarderLineNumberY db "%2u ", 0
+  space db "   ", 0
   returnValue db "Return value of: %u", 10, 0
   userHasWonValue db "User hasWon value: %u", 10, 0
   revealTriedText db "Tried reveal on (%u,%u)", 10, 0
   flagTriedText db "Tried flag on (%u,%u)", 10, 0
   error db "This was not supposed to happen, for debug purposes only.", 0
-
 
 section .bss
   map resq 1
@@ -110,6 +119,8 @@ section .bss
   currentY resq 1
   allocState resq 1
 
+  lineNumberDisplayMode resb 1
+
 section .text
 
 ; rdi - minesweeper x length; rsi - minesweeper y length; rdx - minesweeper mine count
@@ -119,6 +130,10 @@ minesweeper:
 
   mov qword[x], rdi
   mov qword[y], rsi
+
+  mov byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  mov qword[currentX], 0
+  mov qword[currentY], 0
 
   call generateMines
   mov qword[map], rax
@@ -861,8 +876,9 @@ printMinefieldWithColor:
   push r14
   push r13
   push r12
+  push rbx
   mov rbp, rsp
-  sub rsp, 32
+  sub rsp, 24
 
   ; original minefield pointer in r15
   mov r15, rdi
@@ -874,6 +890,19 @@ printMinefieldWithColor:
   ; total x length
   mov qword[rbp-8], rsi
 
+  ; check line number mode
+  cmp byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  je .absLu
+  jmp .relLu
+
+.absLu:
+  mov rbx, 0
+  jmp .printLoopY
+
+.relLu:
+  mov rbx, qword[currentY]
+  jmp .printLoopY
+
 .printLoopY:
   ; set up x pointer
   mov r13, qword[r15]
@@ -881,6 +910,71 @@ printMinefieldWithColor:
   mov r12, qword[rbp-8]
   ; set up x iterator
   mov qword[rbp - 16], 0
+
+  cmp byte[lineNumberDisplayMode], DISABLE_PRINT
+  je .printLoopX
+
+  ; if current row print arrow
+  mov rax, qword[currentY]
+  cmp qword[rbp-24], rax
+  je .printArrowForRow
+
+  ; print row number
+  mov rdi, boarder
+  xor rax, rax
+  call printf
+
+  test rbx, 1
+  jz .continuePrintRowNumber
+
+  mov rdi, invertColors
+  mov rax, 0
+  call printf
+
+.continuePrintRowNumber:
+  mov rdi, boarderLineNumberY
+  mov rsi, rbx
+  call printf
+
+  jmp .prePrintReset
+
+.printArrowForRow:
+  mov rdi, cursorHighlight
+  xor rax, rax
+  call printf
+
+  mov rdi, boarderYArrow
+  xor rax, rax
+  call printf
+  jmp .prePrintReset
+
+.prePrintReset:
+  mov rdi, reset
+  mov rax, 0
+  call printf
+
+  cmp qword[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  je .incrementRowNumber
+  jmp .adjustRowNumber
+
+.incrementRowNumber:
+  inc rbx
+  jmp .printLoopX
+
+.adjustRowNumber:
+  mov rax, qword[currentY]
+  cmp qword[rbp-24], rax
+  je .resetRowNumber
+  jl .decrementRowNumber
+  jg .incrementRowNumber
+
+.resetRowNumber:
+  mov rbx, 1
+  jmp .printLoopX
+
+.decrementRowNumber:
+  dec rbx
+  jmp .printLoopX
 
 .printLoopX:
   cmp byte[r13], 10
@@ -1071,8 +1165,104 @@ printMinefieldWithColor:
   inc qword[rbp  - 24]
   dec r14
   jnz .printLoopY
-  
-  add rsp, 32
+
+.printColumnNumber:
+  mov qword[rbp-24], 0
+
+  mov rdi, space
+  mov rax, 0
+  call printf
+
+  cmp byte[lineNumberDisplayMode], DISABLE_PRINT
+  je .endLoopLineNumber
+
+  ; check line number mode
+  cmp byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  je .ColAbsLu
+  jmp .ColRelLu
+
+.ColAbsLu:
+  mov rbx, 0
+  jmp .columnNumberLoop
+
+.ColRelLu:
+  mov rbx, qword[currentX]
+  jmp .columnNumberLoop
+
+
+.columnNumberLoop:
+
+  ; if current row print arrow
+  mov rax, qword[currentX]
+  cmp qword[rbp-24], rax
+  je .ColPrintArrowForCol
+
+  ; print row number
+  mov rdi, boarder
+  xor rax, rax
+  call printf
+
+  test rbx, 1
+  jz .ColContinuePrintColNumber
+
+  mov rdi, invertColors
+  mov rax, 0
+  call printf
+
+.ColContinuePrintColNumber:
+  mov rdi, boarderLineNumberY
+  mov rsi, rbx
+  call printf
+
+  jmp .ColResetColor
+
+.ColPrintArrowForCol:
+  mov rdi, cursorHighlight
+  xor rax, rax
+  call printf
+
+  mov rdi, boarderXArrow
+  xor rax, rax
+  call printf
+  jmp .ColResetColor
+
+.ColResetColor:
+  mov rdi, reset
+  mov rax, 0
+  call printf
+
+  cmp qword[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+  je .ColIncrementColNumber
+  jmp .ColAdjustColNumber
+
+.ColIncrementColNumber:
+  inc rbx
+  jmp .endLoopLineNumber
+
+.ColAdjustColNumber:
+  mov rax, qword[currentX]
+  cmp qword[rbp-24], rax
+  je .ColResetColNumber
+  jl .ColDecrementColNumber
+  jg .ColIncrementColNumber
+
+.ColResetColNumber:
+  mov rbx, 1
+  jmp .endLoopLineNumber
+
+.ColDecrementColNumber:
+  dec rbx
+  jmp .endLoopLineNumber
+
+.endLoopLineNumber:
+  inc qword[rbp-24]
+  mov rax, qword[x]
+  cmp qword[rbp-24], rax
+  jl .columnNumberLoop
+
+.exitPrintWithColor:
+  add rsp, 24
+  pop rbx
   pop r12
   pop r13
   pop r14
