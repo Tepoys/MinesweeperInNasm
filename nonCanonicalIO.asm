@@ -18,7 +18,7 @@ DEFAULT ABS
 %define FLAG 'f'
 %define QUIT1 'q'
 %define QUIT2 'y'
-%define REVEAL 'g'
+%define REVEAL ' '
 %define HELP 'a'
 %define ABSOLUTE_X 'x'
 %define ABSOLUTE_Y 'y'
@@ -88,7 +88,7 @@ helpText db "This is the help menu, you can exit by pressing any key.", 10
          db "    - by itself will move to row 0", 10, 10
          db "-- Minesweeper actions", 10
          db "'f' - flags the highlighted square (if possible)", 10, 10
-         db "'g' - reveals the highlighted square (if possible)", 10,10
+         db "' ' - reveals the highlighted square (if possible)", 10,10
          db "'d' - toggles line number mode", 10
          db "    - between relative and absolute line number", 10
          db "---------------------------------------------------------", 10
