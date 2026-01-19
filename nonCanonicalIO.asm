@@ -228,7 +228,7 @@ startGame:
   push rax
   ; perform multiplication by 10
   mov rcx, rax
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   mov rax, 10
   xor rdx, rdx
   mul edi
@@ -293,7 +293,7 @@ startGame:
   jmp .validCommand
 
 .moveDown:
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   cmp rdi, 0
   jne .normalDown
   inc rdi
@@ -305,7 +305,7 @@ startGame:
   jmp .validCommand
 
 .moveUp:
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   cmp rdi, 0
   jne .normalUp
   inc rdi
@@ -317,7 +317,7 @@ startGame:
   jmp .validCommand
 
 .moveRight:
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   cmp rdi, 0
   jne .normalRight
   inc rdi
@@ -329,7 +329,7 @@ startGame:
   jmp .validCommand
 
 .moveLeft:
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   cmp rdi, 0
   jne .normalLeft
   inc rdi
@@ -394,19 +394,19 @@ startGame:
 ;----------------------------------------
 
 .absY:
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   call toY
   mov rdi, movedToY
-  movzx rsi, dword[prefixNumber]
+  mov esi, dword[prefixNumber]
   jmp .validCommand
 
 ;----------------------------------------
 
 .absX:
-  movzx rdi, dword[prefixNumber]
+  mov edi, dword[prefixNumber]
   call toX
   mov rdi, movedToX
-  movzx rsi, dword[prefixNumber]
+  mov esi, dword[prefixNumber]
   jmp .validCommand
 
 ;----------------------------------------
