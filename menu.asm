@@ -99,7 +99,7 @@ main:
 
   call clearScreen
  
-  movzx rdi, dword[input]
+  mov edi, dword[input]
   call parseInput
 
   cmp rax, 0
