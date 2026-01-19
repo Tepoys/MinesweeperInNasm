@@ -207,6 +207,7 @@ parseInput:
   mov rdx, MIN_BOMB_COUNT
   mov rcx, rax
   call promptUserNumberInput
+  call clearScreen
 
   mov rdi, qword[rbp-16]
   mov rsi, qword[rbp-24]
