@@ -583,7 +583,7 @@ generateMines:
   call getRand
 
   ; store random x cordinate in r14
-  movzx r14, eax
+  mov r14d, eax
 
   ;generate y random cordinate
   mov rdi, 0
@@ -2231,7 +2231,7 @@ displayUI:
   call setCursorPositionHome
 
   mov rdi, flagCounter
-  movzx rsi, dword[flagCount]
+  mov esi, dword[flagCount]
   xor rax, rax
   call printf
 
