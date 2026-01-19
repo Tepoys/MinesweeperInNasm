@@ -22,6 +22,7 @@ DEFAULT ABS
 %define HELP 'a'
 %define ABSOLUTE_X 'x'
 %define ABSOLUTE_Y 'y'
+%define NUMBER_MODE_TOGGLE 'd'
 
 %define STDIN   0
 %define STDOUT  1
@@ -45,6 +46,7 @@ DEFAULT ABS
 extern printf
 
 extern clearScreen
+extern flushSTDOUT
 
 ; import all UI related minesweeper functions
 extern revealWrapper
@@ -54,6 +56,8 @@ extern moveLeftMinesweeper
 extern moveRightMinesweeper
 extern moveDownMinesweeper
 extern moveUpMinesweeper
+
+extern toggleLineNumberMode
 
 extern toX
 extern toY
@@ -75,7 +79,7 @@ helpText db "This is the help menu, you can exit by pressing any key.", 10
          db "'h' - move left", 10, 10
          db "'j' - move down", 10, 10
          db "'k' - move up", 10, 10
-         db "'l' - move right", 10, 10
+         db "'l' - move right", 10
          db "-- Absolute Controls", 10
          db "You can prefix the below with numbers(12x moves to col12)", 10
          db "'x' - moves to a specific column", 10
@@ -84,7 +88,9 @@ helpText db "This is the help menu, you can exit by pressing any key.", 10
          db "    - by itself will move to row 0", 10, 10
          db "-- Minesweeper actions", 10
          db "'f' - flags the highlighted square (if possible)", 10, 10
-         db "'g' - reveals the highlighted square (if possible)", 10
+         db "'g' - reveals the highlighted square (if possible)", 10,10
+         db "'d' - toggles line number mode", 10
+         db "    - between relative and absolute line number", 10
          db "---------------------------------------------------------", 10
          db "Press any key to continue", 10, 0
 mask db "                                                    ", 10, 0
@@ -110,6 +116,12 @@ moveDownText db "Moved down by %u.", 10, 0
 
 movedToY db "Moved to y=%d", 10, 0
 movedToX db "Moved to x=%d", 10, 0
+
+toggledLineNumberText db "Changed line number mode", 10, 0
+
+commandMask db 0x1B, "[2K", 0x1B, "[G", 0
+cursorRight db 0x1B, "[%uC", 0
+xText db "x", 0
 
 section .bss
 ; termios settings
@@ -168,9 +180,10 @@ startGame:
   mov byte[inputFailCount], 0
   mov byte[quitState], 0
   mov byte[state], IDLE
+  mov byte[currentCommandCount], 0
 
   mov rdi, mask
-  call displayUI
+  call displayUIWrapper
 
 .read_loop:
   call readChar
@@ -207,24 +220,31 @@ startGame:
   mov dword[prefixNumber], eax
   pop rax
   mov byte[state], NUMBER_PREFIX
-  jmp .finishedProcessing
+  jmp .echoNumber
 
 .numberPrefix:
   ; multiply previous prefix number by 10
   ; handle overflow just in case
   push rax
+  ; perform multiplication by 10
   mov rcx, rax
   movzx rdi, dword[prefixNumber]
   mov rax, 10
+  xor rdx, rdx
   mul edi
+  ; result is in rax
+  mov rdx, rax
   pop rax
   jo .prefixNumberOverflow
+
+  ; not overflown -> move result of mul into prefixNumber
+  mov dword[prefixNumber], edx
 
   sub cl, '0'
   add dword[prefixNumber], ecx
   jo .prefixNumberOverflow
 .overflowReturn:
-  jmp .finishedProcessing
+  jmp .echoNumber
 
 .prefixNumberOverflow:
   ; move -1 (max number in two's complement)
@@ -262,7 +282,15 @@ startGame:
 
   cmp al, DOWN
   je .moveDown
+
+  cmp al, NUMBER_MODE_TOGGLE
+  je .toggleNumberMode
   jmp .invalidInput
+
+.toggleNumberMode:
+  call toggleLineNumberMode
+  mov rdi, toggledLineNumberText
+  jmp .validCommand
 
 .moveDown:
   movzx rdi, dword[prefixNumber]
@@ -387,13 +415,13 @@ startGame:
 .gameLost:
   mov byte[gameState], GAME_LOST
   mov rdi, gameLostText
-  call displayUI
+  call displayUIWrapper
   jmp .read_loop
 
 .gameWon:
   mov byte[gameState], GAME_WON
   mov rdi, gameWonText
-  call displayUI
+  call displayUIWrapper
   jmp .read_loop
 
 .displayHelp:
@@ -404,7 +432,7 @@ startGame:
 .quit1:
   mov byte[quitState], 1
   mov rdi, quitConfirm
-  call displayUI
+  call displayUIWrapper
   jmp .read_loop
 
 .quit2OrAbsY:
@@ -417,7 +445,7 @@ startGame:
 
 .invalidInput:
   inc byte[inputFailCount]
-  cmp byte[inputFailCount], 1
+  cmp byte[inputFailCount], 2
   jl .firstInvalid
 
   ; second+ invalid
@@ -429,11 +457,19 @@ startGame:
   jmp .read_loop
 
 .validCommand:
-  call displayUI
+  call displayUIWrapper
   mov dword[prefixNumber], 0
   mov byte[inputFailCount], 0
   mov byte[quitState], 0
   mov byte[state], IDLE
+  mov rdi, currentCommand
+  call echoCommand
+  mov byte[currentCommandCount], 0
+  jmp .read_loop
+
+.echoNumber:
+  mov rdi, currentCommand
+  call echoCommand
   jmp .read_loop
 
 .quitCurrentGame:
@@ -478,3 +514,56 @@ readChar:
   movzx rax, byte[input_byte]
   ret
 
+echoCommand:
+  push rbp
+  push r15
+  mov r15, rdi
+  inc byte[currentCommandCount]
+  cmp byte[currentCommandCount], 1
+  je .clearPreviousCommand
+  jmp .printCurrentCommand
+
+.clearPreviousCommand:
+  mov rdi, commandMask
+  mov rax, 0
+  call printf
+  call flushSTDOUT
+  jmp .printCurrentCommand
+
+.printCurrentCommand:
+  mov rsi, r15
+  ; mov rsi, xText
+  mov rax, SYS_WRITE
+  mov rdi, STDOUT
+  mov rdx, 1
+  syscall
+
+  ; mov rdi, echoCurrentCommandCount
+  ; movzx rsi, byte[currentCommandCount]
+  ; xor rax, rax
+  ; call printf
+
+  pop r15
+  pop rbp
+  ret
+
+; rdi, rsi - passthrough to displayUI
+displayUIWrapper:
+  push rbp
+
+  call displayUI
+
+  cmp byte[currentCommandCount], 0
+  je .end
+
+  mov rdi, cursorRight
+  movzx rsi, byte[currentCommandCount]
+  call printf
+  call flushSTDOUT
+
+.end:
+  ; mov rdi, echoCurrentCommandCount
+  ; movzx rsi, byte[currentCommandCount]
+  ; call printf
+  pop rbp
+  ret

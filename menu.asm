@@ -10,6 +10,7 @@ extern generateMines
 extern positionCursor
 extern clearScreen
 extern promptUserNumberInput
+extern seedRand
 extern minesweeper
 
 %define EASY_DIM 9
@@ -21,7 +22,7 @@ extern minesweeper
 %define EXPERT_MINE 99
 
 %define MIN_X 4
-%define MAX_X 100
+%define MAX_X 40
 %define MIN_Y 4
 %define MAX_Y 60
 %define MIN_BOMB_COUNT 2
@@ -55,6 +56,7 @@ section .text
 main:
   ; align stack frame (16 aligned)
   push rbp
+  call seedRand
 
   mov dword[input], 0
 
@@ -96,10 +98,11 @@ main:
   call flushBuffer
 
   call clearScreen
-  
+ 
   movzx rdi, dword[input]
   call parseInput
 
+  cmp rax, 0
   jz .menuLoop
   jmp exit
 
@@ -114,6 +117,11 @@ exit:
 ; rdi - input choice; rax - exit bool (1 = true; 0 = false)
 parseInput:
   push rbp
+  push rdi
+  push rsi
+  call clearScreen
+  pop rsi
+  pop rdi
   
   ; set up stack frame
   mov rbp, rsp
@@ -212,7 +220,7 @@ parseInput:
 
 .return:
   mov rax, qword[rbp - 8]
-  
+
   add rsp, 32
   pop rbp
 

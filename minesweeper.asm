@@ -79,6 +79,8 @@ global hasWon
 
 global displayUI
 
+global toggleLineNumberMode
+
 extern startGame
 
 extern printf
@@ -177,6 +179,8 @@ minesweeper:
 
   call startGame
 
+  call cleanup
+  call clearScreen
   pop rbp
   ret
 
@@ -2253,3 +2257,43 @@ displayUI:
   pop r15
   pop rbp
   ret
+
+cleanup:
+  push rbp
+  push r15
+  push r14
+
+  mov r15, qword[map]
+
+  mov r14, qword[y]
+
+.loopStart:
+  mov rdi, qword[r15]
+  call free
+
+  add r15, 8
+  dec r14
+  jnz .loopStart
+
+  mov rdi, qword[map]
+  call free
+
+  pop r14
+  pop r15
+  pop rbp
+  ret
+
+  toggleLineNumberMode:
+    cmp byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+    je .toRelative
+    jmp .toAbsolute
+
+  .toRelative:
+    mov byte[lineNumberDisplayMode], RELATIVE_LINE_NUMBER
+    jmp .end
+  .toAbsolute:
+    mov byte[lineNumberDisplayMode], ABSOLUTE_LINE_NUMBER
+    jmp .end
+
+  .end:
+    ret
