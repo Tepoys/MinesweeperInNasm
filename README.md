@@ -20,7 +20,7 @@ git clone https://github.com/Tepoys/MinesweeperInNasm
 ```
 Head into the folder you installed and compile the assembly.
 ```bash
-cd Your/Folder
+cd MinesweeperInNasm
 make MinesweeperInNasm
 ```
 And finally, run the program:
