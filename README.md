@@ -16,7 +16,7 @@ make
 ```
 Clone this git repository.
 ```bash
-git clone github.com/Tepoys/MinesweeperInNasm
+git clone https://github.com/Tepoys/MinesweeperInNasm
 ```
 Head into the folder you installed and compile the assembly.
 ```bash
